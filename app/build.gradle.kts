@@ -35,7 +35,12 @@ android {
         release {
             isMinifyEnabled = true
             isShrinkResources = true
-            signingConfig = signingConfigs.getByName("release")
+            // Локально — наш keystore; на CI его нет, подписываем debug-ключом,
+            // чтобы GitHub Actions мог собирать установочные APK
+            signingConfig = if (file("astraplay.keystore").exists())
+                signingConfigs.getByName("release")
+            else
+                signingConfigs.getByName("debug")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"

@@ -1,0 +1,7 @@
+# Межплатформенные окончания строк
+* text=auto
+gradlew text eol=lf
+*.bat text eol=crlf
+*.png binary
+*.apk binary
+*.keystore binary

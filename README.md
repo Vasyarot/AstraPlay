@@ -1,5 +1,9 @@
 # AstraPlay
 
+![Build](https://github.com/Vasyarot/AstraPlay/actions/workflows/release.yml/badge.svg)
+![Platform](https://img.shields.io/badge/platform-Android%20TV%207.0%2B-green)
+![Size](https://img.shields.io/badge/APK-2.3%20МБ-blue)
+
 Бесплатный медиа-центр для Android TV: IPTV-плейлисты, каталог фильмов и
 сериалов (TMDB), поиск свободного кино и торрентов, локальные видео,
 избранное и история. **Все функции бесплатны — без рекламы, подписок и
@@ -8,39 +12,36 @@ Pro-версий.**
 Аналог LazyMedia Deluxe, написанный с нуля на Kotlin и оптимизированный
 под слабые TV-приставки: **Android 7.0+ (API 24), от 1 ГБ RAM**.
 
-## Готовые APK
+## 📸 Скриншоты
 
-Собранные подписанные APK лежат в папке `dist/` (v1.1):
+| Главный экран | IPTV-каналы | Плеер |
+|:---:|:---:|:---:|
+| ![Главный экран](docs/img/home.png) | ![IPTV](docs/img/iptv.png) | ![Плеер](docs/img/player.png) |
 
-| Файл | Для чего |
-|---|---|
-| `AstraPlay-v1.1-universal-release.apk` | Универсальный — любая архитектура, Android 7–14 |
-| `AstraPlay-v1.1-arm64-v8a-release.apk` | Большинство современных приставок (ARM64) |
-| `AstraPlay-v1.1-armeabi-v7a-release.apk` | Старые 32-битные приставки (ARMv7) |
-| `AstraPlay-v1.1-x86_64-release.apk` | x86-приставки и эмуляторы |
-| `AstraPlay-v1.1-x86-release.apk` | Старые x86-устройства |
+| 12 тем | Настройки |
+|:---:|:---:|
+| ![Темы](docs/img/themes.png) | ![Настройки](docs/img/settings.png) |
 
-Подпись: `app/astraplay.keystore` (пароли в `app/build.gradle.kts`). Для
-перевыпуска со своей подписью замените keystore и пароли.
+## 📥 Установка
+
+Скачайте [`AstraPlay-v1.1-universal.apk`](https://github.com/Vasyarot/AstraPlay/releases/latest)
+из Releases и установите на приставку/ТВ (разрешите установку из
+неизвестных источников). Один APK покрывает **Android 7.0–14 и все
+архитектуры** (ARM/x86 — приложение без нативного кода).
 
 ## Сборка
 
-1. Установите [Android Studio](https://developer.android.com/studio) (Koala или новее).
-2. Откройте папку `AstraPlay` — студия сама подтянет Gradle 8.7 и зависимости.
-3. (Необязательно) Впишите свой ключ TMDB в `gradle.properties`:
-   ```properties
-   TMDB_API_KEY=ваш_ключ
-   ```
-   Бесплатный ключ выдаётся за минуту на
-   [themoviedb.org → Settings → API](https://www.themoviedb.org/settings/api).
-   Ключ также можно вписать позже прямо в приложении: Настройки → Ключ API TMDB.
-4. `Build → Build Bundle(s)/APK(s) → Build APK(s)` — APK в `app/build/outputs/apk/`.
+Требуется JDK 17 и Android SDK (или просто Android Studio).
 
-Команда для CI:
 ```bash
-./gradlew assembleRelease   # release с R8 и сжатием ресурсов
-./gradlew assembleDebug     # отладочный
+./gradlew assembleDebug      # отладочный
+./gradlew assembleRelease    # подписанный release с R8
 ```
+
+На CI (GitHub Actions, `.github/workflows/release.yml`) release собирается
+автоматически на каждый тег `v*` и публикуется в Releases. Без файла
+`app/astraplay.keystore` (не публикуется) CI-сборка подписывается
+debug-ключом.
 
 ## Что внутри
 
