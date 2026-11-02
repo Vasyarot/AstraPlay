@@ -22,8 +22,8 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+      # Android SDK уже предустановлен на ubuntu-раннерах (/usr/local/lib/android/sdk);
+      # AGP сам дозагрузит недостающие platform/build-tools — лицензии приняты.
 
       - name: Build release APK
         run: |
