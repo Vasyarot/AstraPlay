@@ -82,6 +82,7 @@ class IptvActivity : AppCompatActivity() {
         action(getString(R.string.add_playlist)) { showAddPlaylist() }
         action(getString(R.string.iptv_playlists)) { showPlaylists() }
         action(getString(R.string.refresh_playlist)) { updatePlaylist() }
+        action(getString(R.string.update_all)) { updateAllPlaylists() }
         action(getString(R.string.load_epg)) { showEpgSetup() }
         action(getString(R.string.delete)) { deleteCurrentPlaylist() }
 
@@ -204,12 +205,72 @@ class IptvActivity : AppCompatActivity() {
 
     // ---------- действия ----------
 
+    /** Выбор источника: готовые подборки iptv-org или свой URL. */
     private fun showAddPlaylist() {
-        Dialogs.input(this, getString(R.string.playlist_name), getString(R.string.playlist_name)) { name ->
-            Dialogs.input(this, getString(R.string.playlist_url), "http://…/playlist.m3u") { url ->
-                downloadAndSave(name, url)
+        val options = mutableListOf(getString(R.string.preset_custom)) +
+                com.astraplay.tv.data.iptv.IptvPresets.list.map { it.title }
+        Dialogs.choice(this, getString(R.string.choose_playlist_source), options, 0) { idx ->
+            if (idx == 0) {
+                Dialogs.input(this, getString(R.string.playlist_name), getString(R.string.playlist_name)) { name ->
+                    Dialogs.input(this, getString(R.string.playlist_url), "http://…/playlist.m3u") { url ->
+                        downloadAndSave(name, url)
+                    }
+                }
+            } else {
+                val preset = com.astraplay.tv.data.iptv.IptvPresets.list[idx - 1]
+                downloadAndSave(preset.title, preset.url)
             }
         }
+    }
+
+    /** Обновить все плейлисты подряд (для автоактуализации списков каналов). */
+    private fun updateAllPlaylists() {
+        status.text = getString(R.string.updating)
+        status.visible()
+        lifecycleScope.launch {
+            val lists = withContext(Dispatchers.IO) { store.playlists() }
+            var ok = 0
+            for (pl in lists) {
+                val res = withContext(Dispatchers.IO) {
+                    runCatching {
+                        val text = ServiceLocator.http.get(pl.url)
+                        M3uParser.parse(text)
+                    }
+                }
+                res.onSuccess { parsed ->
+                    withContext(Dispatchers.IO) {
+                        store.replaceChannels(pl.id, parsed)
+                        store.touchPlaylist(pl.id)
+                    }
+                    ok++
+                }
+            }
+            if (lists.isNotEmpty()) playlistId = lists.first().id
+            Toast.makeText(this@IptvActivity,
+                getString(R.string.updated_all_done, ok), Toast.LENGTH_SHORT).show()
+            openChannels()
+        }
+    }
+
+    /** Телепрограмма канала: ближайшие передачи из загруженного EPG. */
+    private fun showChannelEpg(ch: Channel) {
+        val epg = ServiceLocator.epg
+        if (!epg.isLoaded) {
+            Toast.makeText(this, getString(R.string.no_epg), Toast.LENGTH_LONG).show()
+            return
+        }
+        val upcoming = epg.upcoming(ch.epgId, 12)
+        if (upcoming.isEmpty()) {
+            Toast.makeText(this, getString(R.string.no_epg), Toast.LENGTH_LONG).show()
+            return
+        }
+        val items = upcoming.map { p ->
+            val day = java.text.SimpleDateFormat("dd.MM", java.util.Locale.getDefault())
+                .format(java.util.Date(p.startMs))
+            "${formatClock(p.startMs)}  ${p.title}" + (if (p.desc != null) "  —  ${p.desc.take(60)}" else "") + "   [$day]"
+        }
+        Dialogs.choice(this,
+            "${getString(R.string.epg_programme)}: ${ch.name}", items, 0) { /* просмотр */ }
     }
 
     private fun showPlaylists() {
@@ -360,12 +421,22 @@ class IptvActivity : AppCompatActivity() {
             )
             holder.card.setOnClickListener { onClick(ch) }
             holder.card.setOnLongClickListener {
-                // долгое нажатие — в избранное
-                val entry = MediaEntry(
-                    kind = Kinds.CHANNEL, itemId = ch.key, title = ch.name,
-                    poster = ch.logo, url = ch.url, subtitle = ch.group)
-                lifecycleScope.launch(Dispatchers.IO) { store.addFavorite(entry) }
-                Toast.makeText(this@IptvActivity, getString(R.string.added_to_fav), Toast.LENGTH_SHORT).show()
+                // меню канала: в избранное или телепрограмма
+                Dialogs.choice(this@IptvActivity,
+                    "${getString(R.string.channel_actions)}: ${ch.name}",
+                    listOf(getString(R.string.add_to_fav), getString(R.string.epg_programme)), 0) { idx ->
+                    when (idx) {
+                        0 -> {
+                            val entry = MediaEntry(
+                                kind = Kinds.CHANNEL, itemId = ch.key, title = ch.name,
+                                poster = ch.logo, url = ch.url, subtitle = ch.group)
+                            lifecycleScope.launch(Dispatchers.IO) { store.addFavorite(entry) }
+                            Toast.makeText(this@IptvActivity,
+                                getString(R.string.added_to_fav), Toast.LENGTH_SHORT).show()
+                        }
+                        else -> showChannelEpg(ch)
+                    }
+                }
                 true
             }
         }

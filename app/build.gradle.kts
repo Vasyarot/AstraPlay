@@ -11,8 +11,8 @@ android {
         applicationId = "com.astraplay.tv"
         minSdk = 24          // Android 7.0 — поддержка TV-приставок 7/8/9+
         targetSdk = 34
-        versionCode = 2
-        versionName = "1.1"
+        versionCode = 3
+        versionName = "1.2"
         vectorDrawables.useSupportLibrary = true
         // Только нужные локали — меньше ресурсов в APK
         resourceConfigurations += listOf("ru", "en")

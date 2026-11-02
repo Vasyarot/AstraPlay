@@ -96,6 +96,26 @@
     <string name="off">Выкл</string>
     <string name="quality">Качество</string>
     <string name="next_episode">Следующая серия</string>
+    <string name="player_menu">Меню плеера</string>
+    <string name="playback_speed">Скорость</string>
+    <string name="resize_mode">Размер кадра</string>
+    <string name="resize_fit">Вписать</string>
+    <string name="resize_fill">Растянуть</string>
+    <string name="resize_zoom">Заполнить (кадрировать)</string>
+    <string name="sleep_timer">Таймер сна</string>
+    <string name="sleep_set">Пауза через %1$d мин</string>
+    <string name="sleep_off">Таймер сна выключен</string>
+    <string name="sleep_done">Таймер сна: пауза</string>
+
+    <!-- IPTV: дополнительно -->
+    <string name="epg_programme">Телепрограмма</string>
+    <string name="no_epg">Телепрограмма не загружена. Нажмите «Загрузить TV guide» и введите XMLTV-URL</string>
+    <string name="update_all">Обновить все плейлисты</string>
+    <string name="updating">Обновление…</string>
+    <string name="updated_all_done">Обновлено плейлистов: %1$d</string>
+    <string name="preset_custom">Свой URL…</string>
+    <string name="choose_playlist_source">Источник плейлиста</string>
+    <string name="channel_actions">Канал</string>
 
     <!-- Настройки -->
     <string name="settings">Настройки</string>

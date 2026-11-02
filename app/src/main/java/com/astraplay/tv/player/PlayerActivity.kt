@@ -210,7 +210,7 @@ class PlayerActivity : AppCompatActivity() {
                 } else super.onKeyDown(keyCode, event)
             }
             KeyEvent.KEYCODE_MENU -> {
-                showTrackMenu(); true
+                showPlayerMenu(); true
             }
             KeyEvent.KEYCODE_BACK -> {
                 if (controllerVisible) playerView.hideController()
@@ -220,21 +220,81 @@ class PlayerActivity : AppCompatActivity() {
         }
     }
 
-    private fun showTrackMenu() {
+    /** Главное меню плеера: дорожки, скорость, кадр, таймер сна. */
+    private fun showPlayerMenu() {
         val p = player ?: return
-        Dialogs.choice(this, getString(R.string.audio_track),
+        Dialogs.choice(this, getString(R.string.player_menu),
             listOf(
                 getString(R.string.audio_track),
                 getString(R.string.subtitles),
+                getString(R.string.playback_speed),
+                getString(R.string.resize_mode),
+                getString(R.string.sleep_timer),
             ), 0) { which ->
-            if (which == 0) {
-                TrackSelectionDialogBuilder(this, getString(R.string.audio_track), p, C.TRACK_TYPE_AUDIO)
+            when (which) {
+                0 -> TrackSelectionDialogBuilder(this, getString(R.string.audio_track), p, C.TRACK_TYPE_AUDIO)
                     .build().show()
-            } else {
-                TrackSelectionDialogBuilder(this, getString(R.string.subtitles), p, C.TRACK_TYPE_TEXT)
+                1 -> TrackSelectionDialogBuilder(this, getString(R.string.subtitles), p, C.TRACK_TYPE_TEXT)
                     .build().show()
+                2 -> chooseSpeed(p)
+                3 -> chooseResize()
+                4 -> chooseSleepTimer()
             }
         }
+    }
+
+    private fun chooseSpeed(p: ExoPlayer) {
+        val labels = listOf("0.75x", "1x", "1.25x", "1.5x", "2x")
+        val values = floatArrayOf(0.75f, 1f, 1.25f, 1.5f, 2f)
+        val current = p.playbackParameters.speed
+        val sel = values.indexOfFirst { kotlin.math.abs(it - current) < 0.01f }.coerceAtLeast(0)
+        Dialogs.choice(this, getString(R.string.playback_speed), labels, sel) { idx ->
+            p.setPlaybackParameters(androidx.media3.common.PlaybackParameters(values[idx]))
+        }
+    }
+
+    private fun chooseResize() {
+        val labels = listOf(
+            getString(R.string.resize_fit),
+            getString(R.string.resize_fill),
+            getString(R.string.resize_zoom),
+        )
+        val modes = intArrayOf(
+            androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT,
+            androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FILL,
+            androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_ZOOM,
+        )
+        val sel = modes.indexOf(playerView.resizeMode).coerceAtLeast(0)
+        Dialogs.choice(this, getString(R.string.resize_mode), labels, sel) { idx ->
+            playerView.resizeMode = modes[idx]
+        }
+    }
+
+    private var sleepRunnable: Runnable? = null
+
+    private fun chooseSleepTimer() {
+        val minutes = listOf(0, 15, 30, 60, 90)
+        val labels = mutableListOf(getString(R.string.off))
+        minutes.drop(1).forEach { labels += getString(R.string.sleep_set, it) }
+        Dialogs.choice(this, getString(R.string.sleep_timer), labels, 0) { idx ->
+            setSleepTimer(minutes[idx])
+        }
+    }
+
+    private fun setSleepTimer(minutes: Int) {
+        sleepRunnable?.let { playerView.removeCallbacks(it) }
+        sleepRunnable = null
+        if (minutes <= 0) {
+            Toast.makeText(this, getString(R.string.sleep_off), Toast.LENGTH_SHORT).show()
+            return
+        }
+        val r = Runnable {
+            player?.pause()
+            Toast.makeText(this, getString(R.string.sleep_done), Toast.LENGTH_LONG).show()
+        }
+        sleepRunnable = r
+        playerView.postDelayed(r, minutes * 60_000L)
+        Toast.makeText(this, getString(R.string.sleep_set, minutes), Toast.LENGTH_SHORT).show()
     }
 
     // ---------- жизненный цикл ----------
@@ -258,6 +318,7 @@ class PlayerActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         saveRunnable?.let { playerView.removeCallbacks(it) }
+        sleepRunnable?.let { playerView.removeCallbacks(it) }
         val p = player
         if (p != null) {
             val pos = p.currentPosition

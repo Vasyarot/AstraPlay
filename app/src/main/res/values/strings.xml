@@ -96,6 +96,26 @@
     <string name="off">Off</string>
     <string name="quality">Quality</string>
     <string name="next_episode">Next episode</string>
+    <string name="player_menu">Player menu</string>
+    <string name="playback_speed">Playback speed</string>
+    <string name="resize_mode">Picture size</string>
+    <string name="resize_fit">Fit</string>
+    <string name="resize_fill">Stretch</string>
+    <string name="resize_zoom">Zoom (crop)</string>
+    <string name="sleep_timer">Sleep timer</string>
+    <string name="sleep_set">Pause in %1$d min</string>
+    <string name="sleep_off">Sleep timer off</string>
+    <string name="sleep_done">Sleep timer: paused</string>
+
+    <!-- IPTV: extras -->
+    <string name="epg_programme">TV guide</string>
+    <string name="no_epg">TV guide not loaded. Press “Load TV guide” and enter an XMLTV URL</string>
+    <string name="update_all">Update all playlists</string>
+    <string name="updating">Updating…</string>
+    <string name="updated_all_done">Playlists updated: %1$d</string>
+    <string name="preset_custom">Custom URL…</string>
+    <string name="choose_playlist_source">Playlist source</string>
+    <string name="channel_actions">Channel</string>
 
     <!-- Настройки -->
     <string name="settings">Settings</string>
