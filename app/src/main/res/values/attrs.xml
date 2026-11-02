@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Кастомные атрибуты темы для программного доступа из UI -->
+    <declare-styleable name="AstraTheme">
+        <attr name="panelBg" format="color" />
+        <attr name="cardBg" format="color" />
+        <attr name="focusStroke" format="color" />
+    </declare-styleable>
+</resources>

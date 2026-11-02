@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="320dp" android:height="180dp"
+    android:viewportWidth="320" android:viewportHeight="180">
+    <!-- Фон -->
+    <path android:fillColor="#0B1026" android:pathData="M0,0h320v180H0z" />
+    <!-- Акцентная полоса снизу -->
+    <path android:fillColor="#6C8CFF" android:pathData="M0,172h320v8H0z" />
+    <!-- Круг с кнопкой Play -->
+    <path android:fillColor="#6C8CFF" android:pathData="M232,90 m-40,0 a40,40 0 1,0 80,0 a40,40 0 1,0 -80,0" />
+    <path android:fillColor="#FFFFFFFF" android:pathData="M218,70 L258,90 218,110 Z" />
+    <!-- Звезда -->
+    <path android:fillColor="#6C8CFF"
+        android:pathData="M72,64l6.18,3.73 -1.64,-7.03L82,9.24l-7.19,-0.61L72,2 69.19,8.63 62,9.24l5.46,4.73L65.82,21z" />
+</vector>

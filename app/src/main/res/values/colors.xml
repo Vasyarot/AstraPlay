@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Базовые -->
+    <color name="black">#000000</color>
+    <color name="white">#FFFFFF</color>
+    <color name="text_primary">#F2F5FA</color>
+    <color name="text_secondary">#9AA3B2</color>
+    <color name="scrim">#CC000000</color>
+    <color name="player_scrim">#66000000</color>
+
+    <!-- 1. Astral (по умолчанию) -->
+    <color name="astral_bg">#0B1026</color>
+    <color name="astral_panel">#141A38</color>
+    <color name="astral_card">#1B2247</color>
+    <color name="astral_accent">#6C8CFF</color>
+    <color name="astral_stroke">#8FA8FF</color>
+
+    <!-- 2. Midnight OLED -->
+    <color name="oled_bg">#000000</color>
+    <color name="oled_panel">#0E0E0E</color>
+    <color name="oled_card">#161616</color>
+    <color name="oled_accent">#3D8BFF</color>
+    <color name="oled_stroke">#66A9FF</color>
+
+    <!-- 3. Emerald -->
+    <color name="emerald_bg">#07130D</color>
+    <color name="emerald_panel">#0E2118</color>
+    <color name="emerald_card">#143023</color>
+    <color name="emerald_accent">#34D399</color>
+    <color name="emerald_stroke">#6FE7B8</color>
+
+    <!-- 4. Crimson -->
+    <color name="crimson_bg">#170A0E</color>
+    <color name="crimson_panel">#26121A</color>
+    <color name="crimson_card">#331823</color>
+    <color name="crimson_accent">#FF5470</color>
+    <color name="crimson_stroke">#FF8298</color>
+
+    <!-- 5. Amber -->
+    <color name="amber_bg">#171207</color>
+    <color name="amber_panel">#26200D</color>
+    <color name="amber_card">#332B13</color>
+    <color name="amber_accent">#FFB74D</color>
+    <color name="amber_stroke">#FFD08A</color>
+
+    <!-- 6. Ice -->
+    <color name="ice_bg">#0A141B</color>
+    <color name="ice_panel">#122230</color>
+    <color name="ice_card">#1A2E3E</color>
+    <color name="ice_accent">#7DD3FC</color>
+    <color name="ice_stroke">#AEE3FF</color>
+
+    <!-- 7. Violet -->
+    <color name="violet_bg">#120A1E</color>
+    <color name="violet_panel">#1E1430</color>
+    <color name="violet_card">#2A1C42</color>
+    <color name="violet_accent">#B388FF</color>
+    <color name="violet_stroke">#CDADFF</color>
+
+    <!-- 8. Teal -->
+    <color name="teal_bg">#06151A</color>
+    <color name="teal_panel">#0C2430</color>
+    <color name="teal_card">#123240</color>
+    <color name="teal_accent">#2DD4BF</color>
+    <color name="teal_stroke">#6FEADC</color>
+
+    <!-- 9. Rose -->
+    <color name="rose_bg">#1B0F14</color>
+    <color name="rose_panel">#2A1820</color>
+    <color name="rose_card">#39202B</color>
+    <color name="rose_accent">#F472B6</color>
+    <color name="rose_stroke">#F9A0CE</color>
+
+    <!-- 10. Graphite -->
+    <color name="graphite_bg">#101010</color>
+    <color name="graphite_panel">#1A1A1A</color>
+    <color name="graphite_card">#242424</color>
+    <color name="graphite_accent">#BDBDBD</color>
+    <color name="graphite_stroke">#E0E0E0</color>
+
+    <!-- 11. Forest -->
+    <color name="forest_bg">#0C1508</color>
+    <color name="forest_panel">#16220E</color>
+    <color name="forest_card">#1F3014</color>
+    <color name="forest_accent">#84CC16</color>
+    <color name="forest_stroke">#A9E44F</color>
+
+    <!-- 12. Coffee -->
+    <color name="coffee_bg">#150F0A</color>
+    <color name="coffee_panel">#221812</color>
+    <color name="coffee_card">#2F211A</color>
+    <color name="coffee_accent">#D7A86E</color>
+    <color name="coffee_stroke">#EAC493</color>
+</resources>

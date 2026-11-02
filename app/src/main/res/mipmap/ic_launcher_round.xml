@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Круглая иконка для Android 7.x -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp" android:height="48dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+    <path android:fillColor="#0B1026"
+        android:pathData="M54,54 m-54,0 a54,54 0 1,0 108,0 a54,54 0 1,0 -108,0" />
+    <path android:fillColor="#6C8CFF" android:pathData="M54,54 m-26,0 a26,26 0 1,0 52,0 a26,26 0 1,0 -52,0" />
+    <path android:fillColor="#FFFFFFFF" android:pathData="M46,42 L66,54 46,66 Z" />
+</vector>

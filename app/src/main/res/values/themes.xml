@@ -1,0 +1,159 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      Базовая тема. Все 12 тем — тёмные (стандарт TV-интерфейсов),
+      различаются палитрой: фон / панели / карточки / акцент / обводка фокуса.
+    -->
+    <style name="Theme.AstraPlay" parent="Theme.AppCompat.NoActionBar">
+        <item name="android:windowBackground">@color/astral_bg</item>
+        <item name="android:colorBackground">@color/astral_bg</item>
+        <item name="android:textColorPrimary">@color/text_primary</item>
+        <item name="android:textColorSecondary">@color/text_secondary</item>
+        <item name="android:textColorTertiary">@color/text_secondary</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowAllowReturnTransitionOverlap">false</item>
+        <item name="colorPrimary">@color/astral_accent</item>
+        <item name="colorPrimaryDark">@color/astral_bg</item>
+        <item name="colorAccent">@color/astral_accent</item>
+        <item name="panelBg">@color/astral_panel</item>
+        <item name="cardBg">@color/astral_card</item>
+        <item name="focusStroke">@color/astral_stroke</item>
+    </style>
+
+    <style name="Theme.AstraPlay.Astral">
+        <item name="colorPrimary">@color/astral_accent</item>
+        <item name="panelBg">@color/astral_panel</item>
+        <item name="cardBg">@color/astral_card</item>
+        <item name="focusStroke">@color/astral_stroke</item>
+    </style>
+
+    <style name="Theme.AstraPlay.Oled">
+        <item name="android:windowBackground">@color/oled_bg</item>
+        <item name="android:colorBackground">@color/oled_bg</item>
+        <item name="colorPrimaryDark">@color/oled_bg</item>
+        <item name="colorPrimary">@color/oled_accent</item>
+        <item name="colorAccent">@color/oled_accent</item>
+        <item name="panelBg">@color/oled_panel</item>
+        <item name="cardBg">@color/oled_card</item>
+        <item name="focusStroke">@color/oled_stroke</item>
+    </style>
+
+    <style name="Theme.AstraPlay.Emerald">
+        <item name="android:windowBackground">@color/emerald_bg</item>
+        <item name="android:colorBackground">@color/emerald_bg</item>
+        <item name="colorPrimaryDark">@color/emerald_bg</item>
+        <item name="colorPrimary">@color/emerald_accent</item>
+        <item name="colorAccent">@color/emerald_accent</item>
+        <item name="panelBg">@color/emerald_panel</item>
+        <item name="cardBg">@color/emerald_card</item>
+        <item name="focusStroke">@color/emerald_stroke</item>
+    </style>
+
+    <style name="Theme.AstraPlay.Crimson">
+        <item name="android:windowBackground">@color/crimson_bg</item>
+        <item name="android:colorBackground">@color/crimson_bg</item>
+        <item name="colorPrimaryDark">@color/crimson_bg</item>
+        <item name="colorPrimary">@color/crimson_accent</item>
+        <item name="colorAccent">@color/crimson_accent</item>
+        <item name="panelBg">@color/crimson_panel</item>
+        <item name="cardBg">@color/crimson_card</item>
+        <item name="focusStroke">@color/crimson_stroke</item>
+    </style>
+
+    <style name="Theme.AstraPlay.Amber">
+        <item name="android:windowBackground">@color/amber_bg</item>
+        <item name="android:colorBackground">@color/amber_bg</item>
+        <item name="colorPrimaryDark">@color/amber_bg</item>
+        <item name="colorPrimary">@color/amber_accent</item>
+        <item name="colorAccent">@color/amber_accent</item>
+        <item name="panelBg">@color/amber_panel</item>
+        <item name="cardBg">@color/amber_card</item>
+        <item name="focusStroke">@color/amber_stroke</item>
+    </style>
+
+    <style name="Theme.AstraPlay.Ice">
+        <item name="android:windowBackground">@color/ice_bg</item>
+        <item name="android:colorBackground">@color/ice_bg</item>
+        <item name="colorPrimaryDark">@color/ice_bg</item>
+        <item name="colorPrimary">@color/ice_accent</item>
+        <item name="colorAccent">@color/ice_accent</item>
+        <item name="panelBg">@color/ice_panel</item>
+        <item name="cardBg">@color/ice_card</item>
+        <item name="focusStroke">@color/ice_stroke</item>
+    </style>
+
+    <style name="Theme.AstraPlay.Violet">
+        <item name="android:windowBackground">@color/violet_bg</item>
+        <item name="android:colorBackground">@color/violet_bg</item>
+        <item name="colorPrimaryDark">@color/violet_bg</item>
+        <item name="colorPrimary">@color/violet_accent</item>
+        <item name="colorAccent">@color/violet_accent</item>
+        <item name="panelBg">@color/violet_panel</item>
+        <item name="cardBg">@color/violet_card</item>
+        <item name="focusStroke">@color/violet_stroke</item>
+    </style>
+
+    <style name="Theme.AstraPlay.Teal">
+        <item name="android:windowBackground">@color/teal_bg</item>
+        <item name="android:colorBackground">@color/teal_bg</item>
+        <item name="colorPrimaryDark">@color/teal_bg</item>
+        <item name="colorPrimary">@color/teal_accent</item>
+        <item name="colorAccent">@color/teal_accent</item>
+        <item name="panelBg">@color/teal_panel</item>
+        <item name="cardBg">@color/teal_card</item>
+        <item name="focusStroke">@color/teal_stroke</item>
+    </style>
+
+    <style name="Theme.AstraPlay.Rose">
+        <item name="android:windowBackground">@color/rose_bg</item>
+        <item name="android:colorBackground">@color/rose_bg</item>
+        <item name="colorPrimaryDark">@color/rose_bg</item>
+        <item name="colorPrimary">@color/rose_accent</item>
+        <item name="colorAccent">@color/rose_accent</item>
+        <item name="panelBg">@color/rose_panel</item>
+        <item name="cardBg">@color/rose_card</item>
+        <item name="focusStroke">@color/rose_stroke</item>
+    </style>
+
+    <style name="Theme.AstraPlay.Graphite">
+        <item name="android:windowBackground">@color/graphite_bg</item>
+        <item name="android:colorBackground">@color/graphite_bg</item>
+        <item name="colorPrimaryDark">@color/graphite_bg</item>
+        <item name="colorPrimary">@color/graphite_accent</item>
+        <item name="colorAccent">@color/graphite_accent</item>
+        <item name="panelBg">@color/graphite_panel</item>
+        <item name="cardBg">@color/graphite_card</item>
+        <item name="focusStroke">@color/graphite_stroke</item>
+    </style>
+
+    <style name="Theme.AstraPlay.Forest">
+        <item name="android:windowBackground">@color/forest_bg</item>
+        <item name="android:colorBackground">@color/forest_bg</item>
+        <item name="colorPrimaryDark">@color/forest_bg</item>
+        <item name="colorPrimary">@color/forest_accent</item>
+        <item name="colorAccent">@color/forest_accent</item>
+        <item name="panelBg">@color/forest_panel</item>
+        <item name="cardBg">@color/forest_card</item>
+        <item name="focusStroke">@color/forest_stroke</item>
+    </style>
+
+    <style name="Theme.AstraPlay.Coffee">
+        <item name="android:windowBackground">@color/coffee_bg</item>
+        <item name="android:colorBackground">@color/coffee_bg</item>
+        <item name="colorPrimaryDark">@color/coffee_bg</item>
+        <item name="colorPrimary">@color/coffee_accent</item>
+        <item name="colorAccent">@color/coffee_accent</item>
+        <item name="panelBg">@color/coffee_panel</item>
+        <item name="cardBg">@color/coffee_card</item>
+        <item name="focusStroke">@color/coffee_stroke</item>
+    </style>
+
+    <!-- Плеер: чёрный экран без лишних декораций -->
+    <style name="Theme.AstraPlay.Player">
+        <item name="android:windowBackground">@color/black</item>
+        <item name="android:windowContentTransitions">false</item>
+        <item name="colorPrimary">@color/white</item>
+        <item name="colorAccent">@color/white</item>
+    </style>
+</resources>
