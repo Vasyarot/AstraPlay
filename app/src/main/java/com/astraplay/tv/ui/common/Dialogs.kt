@@ -86,13 +86,14 @@ object Dialogs {
         dlg.show()
     }
 
-    fun input(context: Context, title: String, hint: String, preset: String = "", onOk: (String) -> Unit) {
+    fun input(context: Context, title: String, hint: String, preset: String = "", allowEmpty: Boolean = false, password: Boolean = false, onOk: (String) -> Unit) {
         val box = content(context, title)
         val edit = EditText(context).apply {
             setText(preset)
             setHint(hint)
             textSize = 15f
             setSingleLine(true)
+            if (password) inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD
             setTextColor(ThemeManager.colorOf(context, android.R.attr.textColorPrimary))
             setHintTextColor(ThemeManager.colorOf(context, android.R.attr.textColorSecondary))
             background = roundedBg(context, withAlpha(Color.WHITE, 18), 8f)
@@ -104,7 +105,7 @@ object Dialogs {
         box.addView(buttonsRow(context, { dlg.dismiss() }, context.getString(R.string.apply)) {
             dlg.dismiss()
             val v = edit.text.toString().trim()
-            if (v.isNotEmpty()) onOk(v)
+            if (allowEmpty || v.isNotEmpty()) onOk(v)
         })
         dlg.show()
         edit.requestFocus()

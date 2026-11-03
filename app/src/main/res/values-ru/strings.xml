@@ -117,6 +117,32 @@
     <string name="choose_playlist_source">Источник плейлиста</string>
     <string name="channel_actions">Канал</string>
 
+    <!-- EPG-сетка -->
+    <string name="epg_grid">Сетка телепрограммы</string>
+    <string name="epg_grid_empty">Телепрограмма не загружена. Нажмите «Загрузить TV guide» в экране IPTV</string>
+
+    <!-- SMB -->
+    <string name="network_smb">Сеть (SMB)</string>
+    <string name="smb_add_server">Добавить сервер</string>
+    <string name="smb_address">Адрес, например smb://192.168.1.10/Video</string>
+    <string name="smb_user">Логин (пусто — гость)</string>
+    <string name="smb_password">Пароль</string>
+    <string name="smb_empty">Добавьте сервер, чтобы смотреть видео по сети</string>
+    <string name="smb_delete_q">Удалить сервер «%1$s»?</string>
+    <string name="smb_connecting">Подключение…</string>
+    <string name="smb_error">Не удалось подключиться. Проверьте адрес/доступы</string>
+    <string name="smb_up">…наверх</string>
+
+    <!-- WebDAV -->
+    <string name="webdav_group">WebDAV-синхронизация</string>
+    <string name="webdav_url">WebDAV URL (папка для бэкапа)</string>
+    <string name="webdav_user">Логин</string>
+    <string name="webdav_password">Пароль</string>
+    <string name="sync_now">Синхронизировать сейчас</string>
+    <string name="sync_desc">Объединяет избранное, историю и позиции между устройствами через ваш WebDAV (Nextcloud, Яндекс.Диск и др.)</string>
+    <string name="sync_done">Синхронизировано ✓</string>
+    <string name="sync_failed">Ошибка синхронизации: проверьте URL/доступы</string>
+
     <!-- Настройки -->
     <string name="settings">Настройки</string>
     <string name="appearance">Внешний вид</string>

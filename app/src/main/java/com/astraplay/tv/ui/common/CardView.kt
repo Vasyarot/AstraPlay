@@ -46,7 +46,7 @@ class PosterCard @JvmOverloads constructor(
         visibility = GONE
     }
 
-    private var focusBorder = roundedBg(context, Color.TRANSPARENT, 10f)
+    private lateinit var artwork: FrameLayout
     private val placeHolder = ColorDrawable(Color.argb(40, 255, 255, 255))
 
     /** Внешний обработчик фокуса (например, для подсказок снизу). */
@@ -57,13 +57,15 @@ class PosterCard @JvmOverloads constructor(
         isFocusable = true
         isClickable = true
         descendantFocusability = FOCUS_BLOCK_DESCENDANTS
-        background = focusBorder
+        background = null
 
         // Скруглённые углы картинок — аккуратный современный вид
         image.clipToOutline = true
         image.background = roundedBg(context, Color.TRANSPARENT, 12f)
 
         val holder = FrameLayout(context).apply {
+            setPadding(4.dp(context), 4.dp(context), 4.dp(context), 4.dp(context))
+            background = roundedBg(context, ThemeManager.cardColor(context), 14f)
             addView(image, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT))
             addView(badge, FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT,
@@ -71,12 +73,16 @@ class PosterCard @JvmOverloads constructor(
                 setMargins(8.dp(context), 8.dp(context), 8.dp(context), 8.dp(context))
             })
         }
+        artwork = holder
+        label.setTextColor(ThemeManager.colorOf(context, android.R.attr.textColorPrimary))
+        label.ellipsize = android.text.TextUtils.TruncateAt.END
+        label.setPadding(4.dp(context), 0, 4.dp(context), 2.dp(context))
         addView(holder, LayoutParams(LayoutParams.MATCH_PARENT, 0, 1f))
-        addView(label, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT).apply {
-            topMargin = 4.dp(context)
+        addView(label, LayoutParams(LayoutParams.MATCH_PARENT, 40.dp(context)).apply {
+            topMargin = 8.dp(context)
         })
 
-        // Свой TV-стиль фокуса: подсветка + масштаб
+        // Фокус выделяет изображение, не перекрывая подпись.
         setOnFocusChangeListener { _, hasFocus ->
             setFocusedStyle(hasFocus)
             onFocus?.invoke(hasFocus)
@@ -88,7 +94,7 @@ class PosterCard @JvmOverloads constructor(
         when (m) {
             MODE_POSTER -> {
                 layoutParams = LayoutParams(132.dp(c), 240.dp(c))
-                label.gone()
+                label.visible()
             }
             MODE_WIDE -> {
                 layoutParams = LayoutParams(220.dp(c), 170.dp(c))
@@ -117,6 +123,9 @@ class PosterCard @JvmOverloads constructor(
     }
 
     fun loadPoster(url: String?) {
+        image.colorFilter = null
+        image.setPadding(0, 0, 0, 0)
+        image.scaleType = ImageView.ScaleType.CENTER_CROP
         if (url.isNullOrBlank()) {
             image.setImageDrawable(placeHolder)
             return
@@ -136,11 +145,14 @@ class PosterCard @JvmOverloads constructor(
     }
 
     fun setFocusedStyle(focused: Boolean) {
-        applyFocusScale(focused)
+        // Keep the title stationary: only the artwork receives a focus ring.
+        animate().cancel()
+        scaleX = 1f
+        scaleY = 1f
         val stroke = if (focused) ThemeManager.strokeColor(context) else Color.TRANSPARENT
         val fill = if (focused) withAlpha(ThemeManager.accentColor(context), 40) else Color.TRANSPARENT
-        focusBorder = roundedBg(context, fill, 10f, stroke, 3f)
-        background = focusBorder
+        artwork.background = roundedBg(context, if (focused) fill else ThemeManager.cardColor(context), 14f, stroke, 2f)
+        label.setTypeface(null, if (focused) Typeface.BOLD else Typeface.NORMAL)
         label.setTextColor(
             if (focused) ThemeManager.accentColor(context)
             else ThemeManager.colorOf(context, android.R.attr.textColorSecondary)

@@ -21,6 +21,9 @@ object Nav {
         context.startActivity(Intent(context, IptvActivity::class.java)
             .putExtra("playlistId", playlistId))
 
+    fun openSources(context: Context) =
+        context.startActivity(Intent(context, com.astraplay.tv.ui.movies.SourcesActivity::class.java))
+
     fun openCatalog(context: Context) =
         context.startActivity(Intent(context, CatalogActivity::class.java))
 
@@ -35,6 +38,13 @@ object Nav {
 
     fun openLocal(context: Context) =
         context.startActivity(Intent(context, LocalActivity::class.java))
+
+    fun openSmb(context: Context) =
+        context.startActivity(Intent(context, com.astraplay.tv.ui.smb.SmbBrowserActivity::class.java))
+
+    fun openEpgGrid(context: Context, playlistId: Long) =
+        context.startActivity(Intent(context, com.astraplay.tv.ui.iptv.EpgGridActivity::class.java)
+            .putExtra("playlistId", playlistId))
 
     fun openSettings(context: Context) =
         context.startActivity(Intent(context, SettingsActivity::class.java))
@@ -56,7 +66,13 @@ object Nav {
         nextTitle: String? = null,
         nextUrl: String? = null,
         nextItemId: String? = null,
-    ) = context.startActivity(Intent(context, PlayerActivity::class.java).apply {
+        playlistId: Long = -1L,
+    ) = if (entry.kind == com.astraplay.tv.data.db.Kinds.WEB) {
+        context.startActivity(Intent(context, com.astraplay.tv.ui.movies.SourceWebActivity::class.java)
+            .putExtra("url", entry.url).putExtra("title", entry.title))
+    } else context.startActivity(Intent(context, if (entry.kind == com.astraplay.tv.data.db.Kinds.CHANNEL)
+        com.astraplay.tv.player.LivePlayerActivity::class.java else PlayerActivity::class.java).apply {
+        putExtra("playlistId", playlistId)
         putExtra("itemId", entry.itemId)
         putExtra("kind", entry.kind)
         putExtra("title", entry.title)

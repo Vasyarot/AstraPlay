@@ -8,12 +8,33 @@ import android.database.sqlite.SQLiteOpenHelper
  * Чистый SQLiteOpenHelper вместо Room: на минимальной прошивке экономим
  * и APK, и память (нет аннотаций, рефлексии и валидации на старте).
  */
-class Db(context: Context) : SQLiteOpenHelper(context, "astraplay.db", null, 1) {
+class Db(context: Context) : SQLiteOpenHelper(context, "astraplay.db", null, 3) {
 
-    override fun onCreate(db: SQLiteDatabase) = execSchema(db)
+    override fun onCreate(db: SQLiteDatabase) {
+        execSchema(db)
+        execV2(db)
+        execV3(db)
+    }
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
-        // v1 — схема только создается
+        if (oldVersion < 2) execV2(db)
+        if (oldVersion < 3) execV3(db)
+    }
+
+    private fun execV3(db: SQLiteDatabase) {
+        db.execSQL("ALTER TABLE channels ADD COLUMN userAgent TEXT")
+        db.execSQL("ALTER TABLE channels ADD COLUMN referrer TEXT")
+    }
+
+    private fun execV2(db: SQLiteDatabase) {
+        db.execSQL(
+            """CREATE TABLE IF NOT EXISTS smb_servers(
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                base TEXT NOT NULL,
+                user TEXT,
+                pass TEXT)"""
+        )
     }
 
     private fun execSchema(db: SQLiteDatabase) {

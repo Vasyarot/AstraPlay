@@ -15,6 +15,8 @@ import com.astraplay.tv.core.ServiceLocator
 import com.astraplay.tv.data.db.Kinds
 import com.astraplay.tv.data.db.MediaEntry
 import com.astraplay.tv.data.iptv.Channel
+import com.astraplay.tv.data.iptv.displayName
+import com.astraplay.tv.data.iptv.displayGroup
 import com.astraplay.tv.data.iptv.M3uParser
 import com.astraplay.tv.ui.common.Dialogs
 import com.astraplay.tv.ui.common.PosterCard
@@ -27,6 +29,9 @@ import com.astraplay.tv.ui.common.visible
 import com.astraplay.tv.ui.common.withAlpha
 import com.astraplay.tv.ui.nav.Nav
 import com.astraplay.tv.ui.theme.ThemeManager
+import kotlinx.coroutines.*
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -40,6 +45,17 @@ class IptvActivity : AppCompatActivity() {
     private var channels: List<Channel> = emptyList()
     private var groups: List<String> = emptyList()
     private var selectedGroup: String? = null
+    private var sortOrder = 0
+    private var searchQuery = ""
+    private var probeJob: Job? = null
+    private var hideFailed = false
+    private val healthPrefs by lazy { getSharedPreferences("iptv_health", MODE_PRIVATE) }
+    private fun health(channel: Channel): Int {
+        val time = healthPrefs.getLong("time_${channel.url}", 0)
+        return if (System.currentTimeMillis() - time > 6 * 3600_000L) 0 else healthPrefs.getInt("state_${channel.url}", 0)
+    }
+    private val channelSettings by lazy { getSharedPreferences("iptv_display", MODE_PRIVATE) }
+    private fun channelTitle(channel: Channel) = channelSettings.getString("name_${channel.url}", null) ?: channel.displayName
 
     private lateinit var root: LinearLayout
     private lateinit var headerTitle: TextView
@@ -48,6 +64,17 @@ class IptvActivity : AppCompatActivity() {
     private lateinit var status: TextView
 
     private val store get() = ServiceLocator.store
+    private val openPlaylistFile = registerForActivityResult(androidx.activity.result.contract.ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) {
+            runCatching { contentResolver.takePersistableUriPermission(uri, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION) }
+            downloadAndSave("Плейлист из файла", uri.toString())
+        }
+    }
+
+    private fun playlistText(url: String): String = if (url.startsWith("content://")) {
+        contentResolver.openInputStream(android.net.Uri.parse(url))?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }
+            ?: error("Не удалось открыть файл")
+    } else ServiceLocator.http.get(url)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         ThemeManager.apply(this)
@@ -74,17 +101,44 @@ class IptvActivity : AppCompatActivity() {
             orientation = LinearLayout.HORIZONTAL
             setPadding(16.dp(), 0, 16.dp(), 4.dp())
         }
-        root.addView(actions)
+        root.addView(android.widget.HorizontalScrollView(this).apply {
+            isHorizontalScrollBarEnabled = false
+            addView(actions)
+        })
 
         fun action(label: String, click: () -> Unit) {
             actions.addView(actionButton(label, click))
         }
-        action(getString(R.string.add_playlist)) { showAddPlaylist() }
-        action(getString(R.string.iptv_playlists)) { showPlaylists() }
-        action(getString(R.string.refresh_playlist)) { updatePlaylist() }
-        action(getString(R.string.update_all)) { updateAllPlaylists() }
-        action(getString(R.string.load_epg)) { showEpgSetup() }
-        action(getString(R.string.delete)) { deleteCurrentPlaylist() }
+        action("Плейлисты") { showPlaylists() }
+        action("Группы") { chooseGroup() }
+        action("Сортировка") { chooseSort() }
+        action("Доступность") { showAvailabilityMenu() }
+        action("VHS") {
+            Dialogs.choice(this, "Эфир VHS на сайте", listOf("VHS-ка • PREMIER", "Видеосалон VHS • VK Видео Live"), 0) { index ->
+                startActivity(android.content.Intent(this, com.astraplay.tv.ui.movies.SourceWebActivity::class.java)
+                    .putExtra("url", if (index == 0) "https://premier.one/tv/vhs" else "https://live.vkvideo.ru/vhstv")
+                    .putExtra("title", "VHS"))
+            }
+        }
+        action("Поиск каналов") {
+            Dialogs.input(this, "Поиск каналов", "Название канала", searchQuery, allowEmpty = true) {
+                searchQuery = it
+                showChannels()
+                channelsGrid.requestFocus()
+            }
+        }
+        action("Ещё") {
+            Dialogs.choice(this, "Управление IPTV", listOf("Добавить плейлист", "Обновить текущий", "Обновить все", "Сетка телепрограммы", "Загрузить телепрограмму", "Удалить текущий"), 0) { index ->
+                when (index) {
+                    0 -> showAddPlaylist()
+                    1 -> updatePlaylist()
+                    2 -> updateAllPlaylists()
+                    3 -> openEpgGrid()
+                    4 -> showEpgSetup()
+                    5 -> deleteCurrentPlaylist()
+                }
+            }
+        }
 
         status = TextView(this).apply {
             textSize = 13f
@@ -94,22 +148,23 @@ class IptvActivity : AppCompatActivity() {
         }
         root.addView(status)
 
-        // Группы
+        val browser = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        root.addView(browser, LinearLayout.LayoutParams(-1, 0, 1f))
+        // Always-visible vertical groups; D-pad right enters the channel grid.
         groupsRow = RecyclerView(this).apply {
-            layoutManager = LinearLayoutManager(this@IptvActivity, LinearLayoutManager.HORIZONTAL, false)
+            layoutManager = LinearLayoutManager(this@IptvActivity, LinearLayoutManager.VERTICAL, false)
             setPadding(16.dp(), 4.dp(), 16.dp(), 4.dp())
             clipToPadding = false
         }
-        root.addView(groupsRow, ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+        browser.addView(groupsRow, LinearLayout.LayoutParams(180.dp(), -1))
 
         // Сетка каналов
         channelsGrid = RecyclerView(this).apply {
-            layoutManager = GridLayoutManager(this@IptvActivity, 5, GridLayoutManager.VERTICAL, false)
+            layoutManager = GridLayoutManager(this@IptvActivity, ((resources.configuration.screenWidthDp - 180) / 180).coerceIn(2, 6))
             setHasFixedSize(true)
             setItemViewCacheSize(8)
         }
-        root.addView(channelsGrid, LinearLayout.LayoutParams(
-            ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
+        browser.addView(channelsGrid, LinearLayout.LayoutParams(0, -1, 1f))
     }
 
     private fun Int.dp() = dpToPx(this@IptvActivity, this)
@@ -125,8 +180,8 @@ class IptvActivity : AppCompatActivity() {
             setTextColor(ThemeManager.colorOf(c, android.R.attr.textColorPrimary))
             background = roundedBg(c, ThemeManager.cardColor(c), 8f)
             layoutParams = LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT
-            ).apply { rightMargin = 8.dp() }
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
+            ).apply { bottomMargin = 8.dp() }
             setOnClickListener { click() }
             setOnFocusChangeListener { v, f ->
                 (v as TextView).background = roundedBg(
@@ -146,7 +201,12 @@ class IptvActivity : AppCompatActivity() {
             val lists = withContext(Dispatchers.IO) { store.playlists() }
             when {
                 lists.isEmpty() -> {
-                    status.text = getString(R.string.playlist_empty)
+                    channels = emptyList()
+                    groups = emptyList()
+                    selectedGroup = null
+                    channelsGrid.adapter = null
+                    groupsRow.adapter = null
+                    status.text = "Добавьте плейлист: Плейлисты или Ещё → Добавить плейлист"
                     status.visible()
                 }
                 playlistId !in lists.map { it.id } -> {
@@ -163,13 +223,21 @@ class IptvActivity : AppCompatActivity() {
 
     private fun openChannels() {
         ServiceLocator.prefs.lastPlaylistId = playlistId
+        selectedGroup = null
+        searchQuery = ""
+        sortOrder = channelSettings.getInt("sort_$playlistId", 0)
+        hideFailed = channelSettings.getBoolean("hide_failed_$playlistId", false)
         lifecycleScope.launch {
             channels = withContext(Dispatchers.IO) { store.channels(playlistId) }
             val pl = withContext(Dispatchers.IO) { store.playlists().firstOrNull { it.id == playlistId } }
             headerTitle.text = pl?.name ?: getString(R.string.section_iptv)
-            groups = channels.mapNotNull { it.group }.distinct().sortedWith(
-                compareBy(String.CASE_INSENSITIVE_ORDER) { it })
+            groups = channels.map { it.displayGroup }.distinct().sortedWith(java.text.Collator.getInstance(java.util.Locale("ru")))
             renderGroups()
+            showChannels()
+            if (pl != null && pl.url.startsWith("https://iptv-org.github.io/") &&
+                System.currentTimeMillis() - pl.updatedAt > 24 * 3600_000L) downloadAndSave(pl.name, pl.url, pl.id)
+            val epgUrl = ServiceLocator.prefs.epgUrl
+            if (ServiceLocator.prefs.autoEpg || epgUrl.isNotBlank()) ServiceLocator.epg.ensureForChannels(channels, epgUrl)
             showChannels()
         }
     }
@@ -180,26 +248,98 @@ class IptvActivity : AppCompatActivity() {
         val adapter = GroupsAdapter(names) { idx ->
             selectedGroup = if (idx == 0) null else names[idx]
             showChannels()
+            groupsRow.adapter?.notifyDataSetChanged()
+            channelsGrid.requestFocus()
         }
         groupsRow.adapter = adapter
     }
 
     private fun showChannels() {
-        val epg = ServiceLocator.epg
-        val list = if (selectedGroup == null) channels
-        else channels.filter { it.group == selectedGroup }
+        val filtered = channels.filter { (selectedGroup == null || it.displayGroup == selectedGroup) &&
+            channelTitle(it).contains(searchQuery, ignoreCase = true) && (!hideFailed || health(it) != -1) }
+        val collator = java.text.Collator.getInstance(java.util.Locale("ru"))
+        val list = when (sortOrder) {
+            1 -> filtered.sortedWith { a, b -> collator.compare(channelTitle(a), channelTitle(b)) }
+            2 -> filtered.sortedWith { a, b -> collator.compare(channelTitle(b), channelTitle(a)) }
+            3 -> filtered.sortedBy { when (health(it)) { 1 -> 0; -1 -> 2; else -> 1 } }
+            else -> filtered
+        }
 
         status.text = if (channels.isEmpty()) getString(R.string.playlist_empty)
         else getString(R.string.channel_count, list.size)
-        status.visibility = if (channels.isEmpty()) android.view.View.VISIBLE else android.view.View.GONE
+        status.visibility = android.view.View.VISIBLE
+        if (searchQuery.isNotEmpty()) status.text = "Найдено: ${list.size} • $searchQuery"
 
         channelsGrid.adapter = ChannelsAdapter(list) { ch ->
             val entry = MediaEntry(
-                kind = Kinds.CHANNEL, itemId = ch.key, title = ch.name,
-                poster = ch.logo, url = ch.url, subtitle = ch.group,
+                kind = Kinds.CHANNEL, itemId = ch.key, title = channelTitle(ch),
+                poster = ch.logo, url = ch.url, subtitle = ch.displayGroup,
             )
             lifecycleScope.launch(Dispatchers.IO) { store.addHistory(entry) }
-            Nav.play(this, entry)
+            Nav.play(this, entry, playlistId = playlistId)
+        }
+    }
+
+    private fun showAvailabilityMenu() {
+        Dialogs.choice(this, "Проверка ссылок", listOf("Проверить каналы плейлиста", if (hideFailed) "Показать недоступные" else "Скрывать недоступные", "Остановить проверку", "Сбросить результаты"), 0) { action ->
+            when (action) {
+                0 -> checkChannels()
+                1 -> {
+                    hideFailed = !hideFailed
+                    channelSettings.edit().putBoolean("hide_failed_$playlistId", hideFailed).apply()
+                    showChannels()
+                }
+                2 -> { probeJob?.cancel(); showChannels() }
+                3 -> { probeJob?.cancel(); healthPrefs.edit().clear().apply(); showChannels() }
+            }
+        }
+    }
+
+    private fun checkChannels() {
+        probeJob?.cancel()
+        val snapshot = channels.toList()
+        if (snapshot.isEmpty()) return
+        val originalPlaylist = playlistId
+        probeJob = lifecycleScope.launch {
+            val semaphore = Semaphore(4)
+            val probe = com.astraplay.tv.data.iptv.ChannelProbe(ServiceLocator.http.client)
+            var done = 0
+            status.visible()
+            status.text = "Проверка ссылок: 0 / ${snapshot.size}"
+            snapshot.map { channel -> async {
+                semaphore.withPermit {
+                    val responds = withContext(Dispatchers.IO) { probe.responds(channel.url, channel.userAgent, channel.referrer) }
+                    healthPrefs.edit().putInt("state_${channel.url}", if (responds) 1 else -1)
+                        .putLong("time_${channel.url}", System.currentTimeMillis()).apply()
+                    done++
+                    if (playlistId == originalPlaylist) status.text = "Проверка ссылок: $done / ${snapshot.size}"
+                }
+            } }.awaitAll()
+            if (playlistId == originalPlaylist) {
+                sortOrder = 3
+                channelSettings.edit().putInt("sort_$playlistId", sortOrder).apply()
+                showChannels()
+                status.text = "Отвечают: ${snapshot.count { health(it) == 1 }} / ${snapshot.size} • проверка ссылки не гарантирует воспроизведение"
+            }
+        }
+    }
+
+    private fun chooseSort() {
+        Dialogs.choice(this, "Сортировка каналов", listOf("Как в плейлисте", "По названию: А–Я", "По названию: Я–А", "Сначала отвечающие каналы"), sortOrder) { order ->
+            sortOrder = order
+            channelSettings.edit().putInt("sort_$playlistId", order).apply()
+            showChannels()
+            channelsGrid.requestFocus()
+        }
+    }
+
+    private fun chooseGroup() {
+        val names = listOf("Все") + groups
+        Dialogs.choice(this, "Группы каналов", names, if (selectedGroup == null) 0 else names.indexOf(selectedGroup).coerceAtLeast(0)) { index ->
+            selectedGroup = if (index == 0) null else names[index]
+            renderGroups()
+            showChannels()
+            channelsGrid.requestFocus()
         }
     }
 
@@ -207,7 +347,7 @@ class IptvActivity : AppCompatActivity() {
 
     /** Выбор источника: готовые подборки iptv-org или свой URL. */
     private fun showAddPlaylist() {
-        val options = mutableListOf(getString(R.string.preset_custom)) +
+        val options = mutableListOf(getString(R.string.preset_custom), "Открыть M3U-файл с устройства") +
                 com.astraplay.tv.data.iptv.IptvPresets.list.map { it.title }
         Dialogs.choice(this, getString(R.string.choose_playlist_source), options, 0) { idx ->
             if (idx == 0) {
@@ -216,8 +356,10 @@ class IptvActivity : AppCompatActivity() {
                         downloadAndSave(name, url)
                     }
                 }
+            } else if (idx == 1) {
+                openPlaylistFile.launch(arrayOf("*/*"))
             } else {
-                val preset = com.astraplay.tv.data.iptv.IptvPresets.list[idx - 1]
+                val preset = com.astraplay.tv.data.iptv.IptvPresets.list[idx - 2]
                 downloadAndSave(preset.title, preset.url)
             }
         }
@@ -233,8 +375,8 @@ class IptvActivity : AppCompatActivity() {
             for (pl in lists) {
                 val res = withContext(Dispatchers.IO) {
                     runCatching {
-                        val text = ServiceLocator.http.get(pl.url)
-                        M3uParser.parse(text)
+                        val text = playlistText(pl.url)
+                        M3uParser.forPlaylist(text, pl.url).also { require(it.isNotEmpty() && !text.trimStart().startsWith("<")) { "Пустой или некорректный плейлист" } }
                     }
                 }
                 res.onSuccess { parsed ->
@@ -245,11 +387,20 @@ class IptvActivity : AppCompatActivity() {
                     ok++
                 }
             }
-            if (lists.isNotEmpty()) playlistId = lists.first().id
+            if (playlistId !in lists.map { it.id }) playlistId = lists.firstOrNull()?.id ?: -1
             Toast.makeText(this@IptvActivity,
                 getString(R.string.updated_all_done, ok), Toast.LENGTH_SHORT).show()
             openChannels()
         }
+    }
+
+    /** Полноэкранная сетка телепрограммы. */
+    private fun openEpgGrid() {
+        if (!ServiceLocator.epg.isLoaded) {
+            Toast.makeText(this, getString(R.string.epg_grid_empty), Toast.LENGTH_LONG).show()
+            return
+        }
+        com.astraplay.tv.ui.nav.Nav.openEpgGrid(this, playlistId)
     }
 
     /** Телепрограмма канала: ближайшие передачи из загруженного EPG. */
@@ -259,7 +410,7 @@ class IptvActivity : AppCompatActivity() {
             Toast.makeText(this, getString(R.string.no_epg), Toast.LENGTH_LONG).show()
             return
         }
-        val upcoming = epg.upcoming(ch.epgId, 12)
+        val upcoming = epg.forChannel(ch.epgId, ch.name, System.currentTimeMillis(), System.currentTimeMillis() + 36 * 3600_000L).take(12)
         if (upcoming.isEmpty()) {
             Toast.makeText(this, getString(R.string.no_epg), Toast.LENGTH_LONG).show()
             return
@@ -309,7 +460,8 @@ class IptvActivity : AppCompatActivity() {
     }
 
     private fun showEpgSetup() {
-        Dialogs.input(this, getString(R.string.load_epg), "http://…/epg.xml") { url ->
+        Dialogs.input(this, getString(R.string.load_epg), "https://…/epg.xml.gz", ServiceLocator.prefs.epgUrl) { url ->
+            ServiceLocator.prefs.epgUrl = url
             status.text = getString(R.string.loading)
             status.visible()
             lifecycleScope.launch {
@@ -333,8 +485,9 @@ class IptvActivity : AppCompatActivity() {
         lifecycleScope.launch {
             val res = withContext(Dispatchers.IO) {
                 runCatching {
-                    val text = ServiceLocator.http.get(url)
-                    M3uParser.parse(text)
+                    val text = playlistText(url)
+                    if (ServiceLocator.prefs.epgUrl.isBlank()) M3uParser.epgUrl(text)?.let { ServiceLocator.prefs.epgUrl = it }
+                    M3uParser.forPlaylist(text, url).also { require(it.isNotEmpty() && !text.trimStart().startsWith("<")) { "Пустой или некорректный плейлист" } }
                 }
             }
             res.fold(
@@ -379,14 +532,18 @@ class IptvActivity : AppCompatActivity() {
                 background = roundedBg(this@IptvActivity, ThemeManager.cardColor(this@IptvActivity), 8f)
             }
             tv.layoutParams = RecyclerView.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT
-            ).apply { rightMargin = 8.dp() }
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
+            ).apply { bottomMargin = 8.dp() }
             return GroupsVH(tv)
         }
         override fun getItemCount() = names.size
         override fun onBindViewHolder(holder: GroupsVH, position: Int) {
             val name = names[position]
             holder.tv.text = name
+            holder.tv.setOnFocusChangeListener { view, focused ->
+                view.background = roundedBg(this@IptvActivity, if (focused) withAlpha(ThemeManager.accentColor(this@IptvActivity), 65) else ThemeManager.cardColor(this@IptvActivity), 10f,
+                    if (focused) ThemeManager.strokeColor(this@IptvActivity) else null, 2f)
+            }
             val selected = if (position == 0) selectedGroup == null else selectedGroup == name
             holder.tv.setTextColor(
                 if (selected) ThemeManager.accentColor(this@IptvActivity)
@@ -405,7 +562,7 @@ class IptvActivity : AppCompatActivity() {
             val card = PosterCard(this@IptvActivity)
             card.applyMode(PosterCard.MODE_WIDE)
             val lp = GridLayoutManager.LayoutParams(
-                220.dp(), 170.dp()
+                ViewGroup.LayoutParams.MATCH_PARENT, 166.dp()
             ).apply { rightMargin = 12.dp(); bottomMargin = 12.dp() }
             card.layoutParams = lp
             return ChannelVH(card)
@@ -414,27 +571,31 @@ class IptvActivity : AppCompatActivity() {
         override fun onBindViewHolder(holder: ChannelVH, position: Int) {
             val ch = list[position]
             holder.card.loadPoster(ch.logo)
-            holder.card.label.text = ch.name
-            val now = ServiceLocator.epg.nowFor(ch.epgId)
+            holder.card.label.text = channelTitle(ch)
+            val now = ServiceLocator.epg.forChannel(ch.epgId, ch.name, System.currentTimeMillis(), System.currentTimeMillis() + 1).firstOrNull()
             holder.card.showBadge(
-                if (now != null) formatClock(now.startMs) + " " + now.title.take(24) else null
+                if (health(ch) == -1) "Не отвечает" else if (now != null) formatClock(now.startMs) + " " + now.title.take(24) else if (health(ch) == 1) "Ссылка отвечает" else null
             )
             holder.card.setOnClickListener { onClick(ch) }
             holder.card.setOnLongClickListener {
                 // меню канала: в избранное или телепрограмма
                 Dialogs.choice(this@IptvActivity,
                     "${getString(R.string.channel_actions)}: ${ch.name}",
-                    listOf(getString(R.string.add_to_fav), getString(R.string.epg_programme)), 0) { idx ->
+                    listOf(getString(R.string.add_to_fav), getString(R.string.epg_programme), "Изменить название"), 0) { idx ->
                     when (idx) {
                         0 -> {
                             val entry = MediaEntry(
-                                kind = Kinds.CHANNEL, itemId = ch.key, title = ch.name,
-                                poster = ch.logo, url = ch.url, subtitle = ch.group)
+                                kind = Kinds.CHANNEL, itemId = ch.key, title = channelTitle(ch),
+                                poster = ch.logo, url = ch.url, subtitle = ch.displayGroup)
                             lifecycleScope.launch(Dispatchers.IO) { store.addFavorite(entry) }
                             Toast.makeText(this@IptvActivity,
                                 getString(R.string.added_to_fav), Toast.LENGTH_SHORT).show()
                         }
-                        else -> showChannelEpg(ch)
+                        1 -> showChannelEpg(ch)
+                        2 -> Dialogs.input(this@IptvActivity, "Название канала", "Название на русском", channelTitle(ch)) { name ->
+                            channelSettings.edit().putString("name_${ch.url}", name).apply()
+                            showChannels()
+                        }
                     }
                 }
                 true

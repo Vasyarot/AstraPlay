@@ -25,10 +25,28 @@ jobs:
       # Android SDK уже предустановлен на ubuntu-раннерах (/usr/local/lib/android/sdk);
       # AGP сам дозагрузит недостающие platform/build-tools — лицензии приняты.
 
+      # Publish only with the established release key. A debug-signed CI APK
+      # cannot update installations signed by the developer's release key.
+      - name: Restore optional release signing key
+        id: signing
+        env:
+          RELEASE_KEYSTORE_BASE64: ${{ secrets.ASTRAPLAY_KEYSTORE_BASE64 }}
+        run: |
+          if [ -n "$RELEASE_KEYSTORE_BASE64" ]; then
+            python -c 'import os, base64; open("app/astraplay.keystore", "wb").write(base64.b64decode(os.environ["RELEASE_KEYSTORE_BASE64"]))'
+            echo "signed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "signed=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Build release APK
+        env:
+          ASTRAPLAY_STORE_PASSWORD: ${{ secrets.ASTRAPLAY_STORE_PASSWORD }}
+          ASTRAPLAY_KEY_ALIAS: ${{ secrets.ASTRAPLAY_KEY_ALIAS }}
+          ASTRAPLAY_KEY_PASSWORD: ${{ secrets.ASTRAPLAY_KEY_PASSWORD }}
         run: |
           chmod +x gradlew
-          ./gradlew assembleRelease --no-daemon --stacktrace
+          ./gradlew lintDebug testDebugUnitTest assembleRelease --no-daemon --stacktrace
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
@@ -37,7 +55,7 @@ jobs:
           path: app/build/outputs/apk/release/*.apk
 
       - name: Publish GitHub Release
-        if: startsWith(github.ref, 'refs/tags/')
+        if: startsWith(github.ref, 'refs/tags/') && steps.signing.outputs.signed == 'true'
         uses: softprops/action-gh-release@v2
         with:
           files: app/build/outputs/apk/release/*.apk

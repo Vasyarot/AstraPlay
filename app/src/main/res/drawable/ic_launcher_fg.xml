@@ -1,8 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="108dp" android:height="108dp"
-    android:viewportWidth="108" android:viewportHeight="108">
-    <!-- Безопасная зона adaptive icon: центр 66x66 -->
-    <path android:fillColor="#6C8CFF" android:pathData="M54,54 m-22,0 a22,22 0 1,0 44,0 a22,22 0 1,0 -44,0" />
-    <path android:fillColor="#FFFFFFFF" android:pathData="M46,42 L66,54 46,66 Z" />
+<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
+<path android:fillColor="#8196FF" android:pathData="M54,22 L84,80 L67,80 L54,52 L41,80 L24,80 Z" />
+    <path android:fillColor="#67E8D3" android:pathData="M49,49 L69,61 L49,73 Z" />
+    <path android:fillColor="#FFFFFF" android:pathData="M80,24 L82,30 L88,32 L82,34 L80,40 L78,34 L72,32 L78,30 Z" />
 </vector>

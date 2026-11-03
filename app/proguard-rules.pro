@@ -7,3 +7,8 @@
 
 # Coil
 -dontwarn coil.**
+
+# jcifs-ng (SMB)
+-dontwarn org.slf4j.**
+-dontwarn jcifs.**
+-keep class jcifs.** { *; }

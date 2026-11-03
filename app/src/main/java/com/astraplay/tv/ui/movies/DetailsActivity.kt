@@ -174,6 +174,7 @@ class DetailsActivity : AppCompatActivity() {
         overview.text = d.item.overview.ifEmpty { getString(R.string.no_results) }
 
         buttons.removeAllViews()
+        btn("Источники просмотра") { Nav.openSources(this) }
         btn(getString(R.string.watch_trailer)) { openTrailer(d) }
         if (mediaType == "tv" && d.seasons.isNotEmpty()) {
             btn(getString(R.string.episodes)) { showSeasonPicker(d) }

@@ -55,7 +55,7 @@ class SettingsActivity : AppCompatActivity() {
             orientation = LinearLayout.VERTICAL
             setPadding(0, 8.dp(this@SettingsActivity), 0, 24.dp(this@SettingsActivity))
         }
-        setContentView(root)
+        setContentView(android.widget.ScrollView(this).apply { addView(root) })
 
         root.addView(makeTitle(this, getString(R.string.settings)))
 
@@ -100,11 +100,33 @@ class SettingsActivity : AppCompatActivity() {
             }
         }
 
+        group("Телепрограмма")
+        toggleRow("Загружать автоматически", prefs.autoEpg) { prefs.autoEpg = it }
+
         group(getString(R.string.data_group))
         row(getString(R.string.backup), "") { createBackup.launch("astraplay-backup.json") }
         row(getString(R.string.restore), "") {
             openBackup.launch(arrayOf("application/json", "text/*", "application/octet-stream"))
         }
+
+        group(getString(R.string.webdav_group))
+        note(getString(R.string.sync_desc))
+        row(getString(R.string.webdav_url), webdavShort(prefs.webdavUrl)) {
+            com.astraplay.tv.ui.common.Dialogs.input(this, getString(R.string.webdav_url),
+                "https://webdav.server.ru/path/", prefs.webdavUrl) { v ->
+                prefs.webdavUrl = v; recreate()
+            }
+        }
+        row(getString(R.string.webdav_user), if (prefs.webdavUser.isBlank()) "—" else prefs.webdavUser) {
+            com.astraplay.tv.ui.common.Dialogs.input(this, getString(R.string.webdav_user),
+                "", prefs.webdavUser, allowEmpty = true) { v -> prefs.webdavUser = v; recreate() }
+        }
+        row(getString(R.string.webdav_password), if (prefs.webdavPass.isBlank()) "—" else "••••") {
+            com.astraplay.tv.ui.common.Dialogs.input(this, getString(R.string.webdav_password),
+                "", "", allowEmpty = true, password = true) { v -> prefs.webdavPass = v; recreate() }
+        }
+        row(getString(R.string.sync_now), "") { runWebDavSync() }
+
         row(getString(R.string.clear_cache), "") {
             lifecycleScope.launch(Dispatchers.IO) {
                 File(cacheDir, "image_cache").deleteRecursively()
@@ -118,6 +140,35 @@ class SettingsActivity : AppCompatActivity() {
     }
 
     private fun selIdx(value: Int, options: List<Int>): Int = options.indexOf(value).coerceAtLeast(0)
+
+    private fun webdavShort(url: String): String =
+        if (url.isBlank()) "—" else url.substringAfter("://").take(28)
+
+    private fun runWebDavSync() {
+        val url = prefs.webdavUrl.trimEnd('/')
+        if (url.isBlank()) {
+            Toast.makeText(this, getString(R.string.webdav_url), Toast.LENGTH_SHORT).show()
+            return
+        }
+        Toast.makeText(this, getString(R.string.loading), Toast.LENGTH_SHORT).show()
+        lifecycleScope.launch(Dispatchers.IO) {
+            val result = runCatching {
+                val dav = com.astraplay.tv.data.webdav.WebDav(ServiceLocator.http)
+                val remote = dav.fetch("$url/astraplay-backup.json",
+                    prefs.webdavUser.ifBlank { null }, prefs.webdavPass.ifBlank { null })
+                if (!remote.isNullOrBlank()) store.importJson(remote)  // объединение
+                dav.put("$url/astraplay-backup.json",
+                    prefs.webdavUser.ifBlank { null }, prefs.webdavPass.ifBlank { null },
+                    store.exportJson())
+            }
+            runOnUiThread {
+                Toast.makeText(this@SettingsActivity,
+                    if (result.isSuccess) getString(R.string.sync_done)
+                    else getString(R.string.sync_failed),
+                    Toast.LENGTH_LONG).show()
+            }
+        }
+    }
 
     // ---------- элементы ----------
 

@@ -164,19 +164,7 @@ class TorrentActivity : AppCompatActivity() {
     }
 
     private fun openTorrent(item: ArchiveItem, url: String) {
-        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
-        val resolved = packageManager.queryIntentActivities(intent, 0)
-        if (resolved.isEmpty()) {
-            // запасной путь: magnet-приложения
-            val magnet = Intent(Intent.ACTION_VIEW, Uri.parse("magnet:?xt=urn:btih:${item.identifier}&dn=${Uri.encode(item.title)}"))
-            if (packageManager.queryIntentActivities(magnet, 0).isEmpty()) {
-                Toast.makeText(this, getString(R.string.no_torrent_app), Toast.LENGTH_LONG).show()
-                return
-            }
-            startActivity(magnet)
-            return
-        }
-        startActivity(intent)
+        startActivity(Intent(this, TorrentPlayerActivity::class.java).putExtra("link", url))
     }
 
     private class ResultVH(

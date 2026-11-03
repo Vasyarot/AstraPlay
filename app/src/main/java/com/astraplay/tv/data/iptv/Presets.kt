@@ -11,6 +11,10 @@ object IptvPresets {
     val list: List<Preset> = listOf(
         Preset("🇷🇺 Россия", "https://iptv-org.github.io/iptv/countries/ru.m3u"),
         Preset("Русскоязычные каналы", "https://iptv-org.github.io/iptv/languages/rus.m3u"),
+        Preset("Русскоязычные • музыка", "https://iptv-org.github.io/iptv/languages/rus.m3u#astra-category=music"),
+        Preset("Русскоязычные • кино", "https://iptv-org.github.io/iptv/languages/rus.m3u#astra-category=movies"),
+        Preset("Русскоязычные • сериалы", "https://iptv-org.github.io/iptv/languages/rus.m3u#astra-category=series"),
+        Preset("Русскоязычные • детские", "https://iptv-org.github.io/iptv/languages/rus.m3u#astra-category=kids"),
         Preset("Новости", "https://iptv-org.github.io/iptv/categories/news.m3u"),
         Preset("Музыка", "https://iptv-org.github.io/iptv/categories/music.m3u"),
         Preset("Спорт", "https://iptv-org.github.io/iptv/categories/sports.m3u"),

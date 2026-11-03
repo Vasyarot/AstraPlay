@@ -54,14 +54,46 @@ class HomeActivity : AppCompatActivity() {
             setPadding(0, 8.dp(this@HomeActivity), 0, 24.dp(this@HomeActivity))
         }
         scroll.addView(content)
-        setContentView(scroll)
+        val root = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        val sidebarScroll = ScrollView(this).apply { isVerticalScrollBarEnabled = false }
+        val sidebar = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(10.dp(this@HomeActivity), 20.dp(this@HomeActivity), 10.dp(this@HomeActivity), 12.dp(this@HomeActivity))
+            setBackgroundColor(ThemeManager.panelColor(this@HomeActivity))
+        }
+        sidebar.addView(TextView(this).apply {
+            text = "ASTRA / PLAY"
+            textSize = 18f
+            setTypeface(typeface, android.graphics.Typeface.BOLD)
+            setTextColor(ThemeManager.accentColor(this@HomeActivity))
+            setPadding(10.dp(this@HomeActivity), 0, 0, 20.dp(this@HomeActivity))
+        })
+        var firstDestination: TextView? = null
+        fun destination(label: String, icon: Int, action: () -> Unit) {
+            val button = com.astraplay.tv.ui.common.tvButton(this, label, icon, action)
+            sidebar.addView(button)
+            if (firstDestination == null) firstDestination = button
+        }
+        destination("Фильмы и сериалы", R.drawable.ic_movie) { Nav.openSources(this) }
+        destination("Поиск", R.drawable.ic_search) { Nav.openSearch(this) }
+        destination("Телеканалы", R.drawable.ic_tv) { Nav.openIptv(this) }
+        destination("Избранное", R.drawable.ic_star) { Nav.openUserData(this) }
+        destination("История", R.drawable.ic_history) { Nav.openUserData(this, true) }
+        destination("Торренты", R.drawable.ic_magnet) { startActivity(Intent(this, com.astraplay.tv.ui.torrent.TorrentPlayerActivity::class.java)) }
+        destination("Мои видео", R.drawable.ic_folder) { Nav.openLocal(this) }
+        destination("Сетевые папки", R.drawable.ic_network) { Nav.openSmb(this) }
+        destination("Настройки", R.drawable.ic_settings) { Nav.openSettings(this) }
+        sidebarScroll.addView(sidebar)
+        root.addView(sidebarScroll, LinearLayout.LayoutParams(196.dp(this), ViewGroup.LayoutParams.MATCH_PARENT))
+        root.addView(scroll, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f))
+        setContentView(root)
 
         buildHeader()
         sectionsHost = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
         }
         content.addView(sectionsHost)
-        loadSections()
+        if (savedInstanceState == null) firstDestination?.post { firstDestination?.requestFocus() }
     }
 
     override fun onResume() {
@@ -89,34 +121,35 @@ class HomeActivity : AppCompatActivity() {
         header.addView(TextView(c).apply {
             textSize = 14f
             setTextColor(ThemeManager.colorOf(c, android.R.attr.textColorSecondary))
-            text = SimpleDateFormat("EEE, d MMM HH:mm", Locale.getDefault()).format(Date())
+            text = SimpleDateFormat("EEE, d MMM HH:mm", Locale("ru")).format(Date())
         })
         content.addView(header)
 
-        // Быстрые действия
-        val actions = LinearLayout(c).apply { orientation = LinearLayout.HORIZONTAL }
-        content.addView(actions)
-
-        fun action(icon: Int, label: String, click: () -> Unit) {
-            val card = PosterCard(c)
-            card.applyMode(PosterCard.MODE_SQUARE)
-            card.layoutParams = LinearLayout.LayoutParams(card.layoutParams.width, card.layoutParams.height).apply {
-                leftMargin = 16.dp(c)
-            }
-            card.setIcon(icon, ThemeManager.accentColor(c))
-            card.label.text = label
-            card.setOnClickListener { click() }
-            actions.addView(card)
+        val hero = LinearLayout(c).apply {
+            orientation = LinearLayout.VERTICAL
+            background = com.astraplay.tv.ui.common.roundedBg(c, ThemeManager.panelColor(c), 20f)
+            setPadding(24.dp(c), 22.dp(c), 24.dp(c), 22.dp(c))
         }
-
-        action(R.drawable.ic_search, getString(R.string.search)) { Nav.openSearch(c) }
-        action(R.drawable.ic_tv, getString(R.string.section_iptv)) { Nav.openIptv(c) }
-        action(R.drawable.ic_movie, getString(R.string.section_catalog)) { Nav.openCatalog(c) }
-        action(R.drawable.ic_magnet, getString(R.string.section_torrents)) { Nav.openTorrent(c) }
-        action(R.drawable.ic_folder, getString(R.string.section_local)) { Nav.openLocal(c) }
-        action(R.drawable.ic_star, getString(R.string.favorites)) { Nav.openUserData(c, false) }
-        action(R.drawable.ic_history, getString(R.string.history)) { Nav.openUserData(c, true) }
-        action(R.drawable.ic_settings, getString(R.string.settings)) { Nav.openSettings(c) }
+        hero.addView(TextView(c).apply {
+            text = "Ваш вечер. Ваш выбор."
+            textSize = 30f
+            setTypeface(typeface, android.graphics.Typeface.BOLD)
+            setTextColor(ThemeManager.colorOf(c, android.R.attr.textColorPrimary))
+        })
+        hero.addView(TextView(c).apply {
+            text = "Фильмы, сериалы и любимые телеканалы в одном месте"
+            textSize = 14f
+            setTextColor(ThemeManager.colorOf(c, android.R.attr.textColorSecondary))
+            setPadding(0, 8.dp(c), 0, 16.dp(c))
+        })
+        hero.addView(com.astraplay.tv.ui.common.tvButton(c, "Выбрать источник", R.drawable.ic_play) { Nav.openSources(c) })
+        content.addView(hero, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+            setMargins(20.dp(c), 8.dp(c), 20.dp(c), 16.dp(c))
+        })
+        val quick = LinearLayout(c).apply { orientation = LinearLayout.HORIZONTAL }
+        quick.addView(com.astraplay.tv.ui.common.tvButton(c, "Каталог TMDB", R.drawable.ic_movie) { Nav.openCatalog(c) }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        quick.addView(com.astraplay.tv.ui.common.tvButton(c, "Свободное кино", R.drawable.ic_play) { Nav.openTorrent(c) }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        content.addView(quick, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { setMargins(16.dp(c), 0, 16.dp(c), 12.dp(c)) })
     }
 
     // ---------- секции ----------
@@ -138,7 +171,7 @@ class HomeActivity : AppCompatActivity() {
 
         // 1. Продолжить просмотр
         lifecycleScope.launch {
-            val positions = withContext(Dispatchers.IO) { store.positions() }
+            val positions = withContext(Dispatchers.IO) { store.positions().filter { it.positionMs > 5_000 && (it.durationMs <= 0 || it.positionMs < it.durationMs - 30_000) } }
             if (stale()) return@launch
             val row = addRow<MediaEntry>(getString(R.string.section_continue))
             if (positions.isEmpty()) {
@@ -218,29 +251,6 @@ class HomeActivity : AppCompatActivity() {
             }
         }
 
-        // 5. Приложения
-        lifecycleScope.launch {
-            val apps = withContext(Dispatchers.IO) { loadTvApps() }
-            if (stale()) return@launch
-            val row = addRow<AppRef>(getString(R.string.section_apps))
-            if (apps.isEmpty()) { row.gone(); return@launch }
-            row.setData(apps.map { AppRef(it) }, PosterCard.MODE_SQUARE,
-                binder = { card, ref ->
-                    card.label.text = ref.info.loadLabel(packageManager).toString()
-                    card.showBadge(null)
-                    card.image.setImageDrawable(ref.info.loadIcon(packageManager))
-                    card.image.scaleType = android.widget.ImageView.ScaleType.CENTER_INSIDE
-                    card.image.setPadding(20.dp(this@HomeActivity), 20.dp(this@HomeActivity), 20.dp(this@HomeActivity), 8.dp(this@HomeActivity))
-                    card.image.colorFilter = null
-                },
-                click = { ref ->
-                    val intent = packageManager.getLaunchIntentForPackage(ref.info.packageName)
-                    if (intent != null) {
-                        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                        startActivity(intent)
-                    }
-                })
-        }
     }
 
     /** Куда открывать запись из избранного — по типу. */
@@ -268,23 +278,4 @@ class HomeActivity : AppCompatActivity() {
 
     data class PlaylistRef(val p: Playlist)
     data class TmdbRef(val item: com.astraplay.tv.data.tmdb.TmdbItem)
-    data class AppRef(val info: android.content.pm.ActivityInfo)
-
-    private fun loadTvApps(): List<android.content.pm.ActivityInfo> {
-        val pm = packageManager
-        val main = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LEANBACK_LAUNCHER)
-        val resolve = pm.queryIntentActivities(main, 0)
-        val out = ArrayList<android.content.pm.ActivityInfo>(resolve.size)
-        resolve.forEach {
-            if (it.activityInfo.packageName != packageName) out += it.activityInfo
-        }
-        if (out.isEmpty()) {
-            // fallback: обычные лаунчеры
-            val touch = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
-            pm.queryIntentActivities(touch, 0).forEach {
-                if (it.activityInfo.packageName != packageName) out += it.activityInfo
-            }
-        }
-        return out.sortedBy { it.loadLabel(pm).toString().lowercase(Locale.getDefault()) }
-    }
 }

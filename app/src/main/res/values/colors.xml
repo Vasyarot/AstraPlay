@@ -9,10 +9,10 @@
     <color name="player_scrim">#66000000</color>
 
     <!-- 1. Astral (по умолчанию) -->
-    <color name="astral_bg">#0B1026</color>
-    <color name="astral_panel">#141A38</color>
-    <color name="astral_card">#1B2247</color>
-    <color name="astral_accent">#6C8CFF</color>
+    <color name="astral_bg">#0C0F19</color>
+    <color name="astral_panel">#151A2A</color>
+    <color name="astral_card">#20273A</color>
+    <color name="astral_accent">#92A4FF</color>
     <color name="astral_stroke">#8FA8FF</color>
 
     <!-- 2. Midnight OLED -->

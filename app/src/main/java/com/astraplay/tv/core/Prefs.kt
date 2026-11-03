@@ -45,6 +45,27 @@ class Prefs(context: Context) {
         get() = sp.getLong(KEY_LAST_PLAYLIST, -1L)
         set(v) = sp.edit().putLong(KEY_LAST_PLAYLIST, v).apply()
 
+    var autoEpg: Boolean
+        get() = sp.getBoolean("auto_epg", true)
+        set(v) = sp.edit().putBoolean("auto_epg", v).apply()
+
+    var epgUrl: String
+        get() = sp.getString("epg_url", "") ?: ""
+        set(v) = sp.edit().putString("epg_url", v).apply()
+
+    // ---- WebDAV ----
+    var webdavUrl: String
+        get() = sp.getString(KEY_WEBDAV_URL, "") ?: ""
+        set(v) = sp.edit().putString(KEY_WEBDAV_URL, v).apply()
+
+    var webdavUser: String
+        get() = sp.getString(KEY_WEBDAV_USER, "") ?: ""
+        set(v) = sp.edit().putString(KEY_WEBDAV_USER, v).apply()
+
+    var webdavPass: String
+        get() = sp.getString(KEY_WEBDAV_PASS, "") ?: ""
+        set(v) = sp.edit().putString(KEY_WEBDAV_PASS, v).apply()
+
     fun clearAll() {
         sp.edit().clear().apply()
     }
@@ -58,6 +79,9 @@ class Prefs(context: Context) {
         const val KEY_SEEK_STEP = "seek_step"
         const val KEY_AUTOSTART = "autostart"
         const val KEY_LAST_PLAYLIST = "last_playlist"
+        const val KEY_WEBDAV_URL = "webdav_url"
+        const val KEY_WEBDAV_USER = "webdav_user"
+        const val KEY_WEBDAV_PASS = "webdav_pass"
         const val DEFAULT_TMDB_KEY = ""
     }
 }

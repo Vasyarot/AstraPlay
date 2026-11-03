@@ -30,6 +30,7 @@ import kotlinx.coroutines.launch
  * прямые mp4. Resume-позиции, буфер по настройке, дорожки звука/субтитров,
  * автопереход к следующей серии.
  */
+@androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 class PlayerActivity : AppCompatActivity() {
 
     private var player: ExoPlayer? = null
@@ -52,6 +53,8 @@ class PlayerActivity : AppCompatActivity() {
 
     /** Видим ли контроллер (для поведения D-pad влево/вправо). */
     private var controllerVisible = false
+    private var playbackCompleted = false
+    private val persistenceScope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + Dispatchers.IO)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         ThemeManager.apply(this)
@@ -95,7 +98,8 @@ class PlayerActivity : AppCompatActivity() {
     private fun initPlayer() {
         if (url.isBlank()) { finish(); return }
 
-        val bufferMs = prefs.hlsBufferSecs * 1000
+        playbackCompleted = false
+        val bufferMs = prefs.hlsBufferSecs.coerceIn(5, 120) * 1000
         val loadControl = DefaultLoadControl.Builder()
             .setBufferDurationsMs(
                 /* minBufferMs = */ bufferMs,
@@ -111,15 +115,28 @@ class PlayerActivity : AppCompatActivity() {
             .apply {
                 setWakeMode(C.WAKE_MODE_NETWORK)
                 addListener(playerListener)
-                setMediaItem(
-                    MediaItem.Builder()
-                        .setUri(url)
-                        .setMediaMetadata(
-                            androidx.media3.common.MediaMetadata.Builder()
-                                .setTitle(title)
-                                .setSubtitle(subtitle)
+                if (url.startsWith("smb://")) {
+                    // Видео из SMB-шары: свой DataSource с поддержкой seek
+                    val source = androidx.media3.exoplayer.source.ProgressiveMediaSource
+                        .Factory { com.astraplay.tv.data.smb.SmbDataSource() }
+                        .createMediaSource(
+                            MediaItem.Builder().setUri(url)
+                                .setMediaMetadata(
+                                    androidx.media3.common.MediaMetadata.Builder()
+                                        .setTitle(title).setSubtitle(subtitle).build())
                                 .build())
-                        .build())
+                    setMediaSource(source)
+                } else {
+                    setMediaItem(
+                        MediaItem.Builder()
+                            .setUri(url)
+                            .setMediaMetadata(
+                                androidx.media3.common.MediaMetadata.Builder()
+                                    .setTitle(title)
+                                    .setSubtitle(subtitle)
+                                    .build())
+                            .build())
+                }
                 // resume, если позиция осмысленная
                 if (startPos > 5_000 && (duration <= 0 || startPos < duration - 30_000)) {
                     seekTo(startPos)
@@ -139,9 +156,11 @@ class PlayerActivity : AppCompatActivity() {
 
         override fun onPlaybackStateChanged(state: Int) {
             if (state == Player.STATE_ENDED) {
-                lifecycleScope.launch(Dispatchers.IO) {
-                    store.savePosition(currentEntry(positionMs = 0))
-                    store.addHistory(currentEntry())
+                playbackCompleted = true
+                val entry = currentEntry(positionMs = 0)
+                persistenceScope.launch {
+                    store.savePosition(entry)
+                    store.addHistory(entry)
                 }
                 // автопереход к следующей серии
                 if (prefs.autoplayNext && !nextUrl.isNullOrBlank()) {
@@ -157,15 +176,15 @@ class PlayerActivity : AppCompatActivity() {
     private var saveRunnable: Runnable? = null
 
     private fun startSaving() {
+        saveRunnable?.let { playerView.removeCallbacks(it) }
         val r = object : Runnable {
             override fun run() {
                 val p = player
                 if (p != null && p.isPlaying) {
                     val pos = p.currentPosition
                     val dur = p.duration.takeIf { it > 0 } ?: 0L
-                    lifecycleScope.launch(Dispatchers.IO) {
-                        store.savePosition(currentEntry(pos, dur))
-                    }
+                    val entry = currentEntry(pos, dur)
+                    persistenceScope.launch { store.savePosition(entry) }
                 }
                 playerView.postDelayed(this, 5_000)
             }
@@ -213,8 +232,8 @@ class PlayerActivity : AppCompatActivity() {
                 showPlayerMenu(); true
             }
             KeyEvent.KEYCODE_BACK -> {
-                if (controllerVisible) playerView.hideController()
-                finish(); true
+                if (controllerVisible) playerView.hideController() else finish()
+                true
             }
             else -> super.onKeyDown(keyCode, event)
         }
@@ -302,12 +321,11 @@ class PlayerActivity : AppCompatActivity() {
     override fun onPause() {
         super.onPause()
         val p = player
-        if (p != null && p.isPlaying) {
+        if (p != null && !playbackCompleted) {
             val pos = p.currentPosition
             val dur = p.duration.takeIf { it > 0 } ?: 0L
-            lifecycleScope.launch(Dispatchers.IO) {
-                store.savePosition(currentEntry(pos, dur))
-            }
+            val entry = currentEntry(pos, dur)
+            persistenceScope.launch { store.savePosition(entry) }
         }
     }
 
@@ -323,9 +341,10 @@ class PlayerActivity : AppCompatActivity() {
         if (p != null) {
             val pos = p.currentPosition
             val dur = p.duration.takeIf { it > 0 } ?: 0L
-            lifecycleScope.launch(Dispatchers.IO) {
-                store.savePosition(currentEntry(pos, dur))
-                store.addHistory(currentEntry())
+            val entry = currentEntry(if (playbackCompleted) 0 else pos, dur)
+            persistenceScope.launch {
+                store.savePosition(entry)
+                store.addHistory(entry)
             }
             p.release()
             player = null

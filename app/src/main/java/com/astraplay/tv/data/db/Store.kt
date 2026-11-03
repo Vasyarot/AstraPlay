@@ -12,6 +12,28 @@ object Kinds {
     const val SERIES = "series"
     const val LOCAL = "local"
     const val TORRENT = "torrent"
+    const val WEB = "web"
+}
+
+/** SMB-сервер из списка. */
+data class SmbServer(
+    val id: Long,
+    val name: String,
+    val base: String,   // smb://host/share без учётных данных
+    val user: String?,  // null/пусто — гость
+    val pass: String?,
+) {
+    /** Полный URL с учётными данными (для jcifs и плеера). */
+    fun url(path: String = ""): String {
+        val cleanBase = base.trimEnd('/')
+        val suffix = if (path.startsWith("/")) path else "/$path"
+        return if (user.isNullOrBlank()) "$cleanBase$suffix"
+        else {
+            val encUser = java.net.URLEncoder.encode(user, "UTF-8")
+            val encPass = java.net.URLEncoder.encode(pass ?: "", "UTF-8")
+            "smb://$encUser:$encPass@" + cleanBase.removePrefix("smb://") + suffix
+        }
+    }
 }
 
 /** Единая модель для избранного/истории/позиций — упрощает адаптеры. */
@@ -82,6 +104,8 @@ class Store(context: Context) {
                 cv.put("logo", ch.logo)
                 cv.put("grp", ch.group)
                 cv.put("epgId", ch.epgId)
+                cv.put("userAgent", ch.userAgent)
+                cv.put("referrer", ch.referrer)
                 cv.put("sortOrder", i)
                 db.insert("channels", null, cv)
             }
@@ -94,14 +118,15 @@ class Store(context: Context) {
     fun channels(playlistId: Long): List<Channel> {
         val out = mutableListOf<Channel>()
         db.rawQuery(
-            "SELECT id,name,url,logo,grp,epgId FROM channels WHERE playlistId=? ORDER BY sortOrder",
+            "SELECT id,name,url,logo,grp,epgId,userAgent,referrer FROM channels WHERE playlistId=? ORDER BY sortOrder",
             arrayOf(playlistId.toString())
         ).use { c ->
             while (c.moveToNext()) {
                 out += Channel(
                     id = c.getLong(0), playlistId = playlistId, name = c.getString(1),
                     url = c.getString(2), logo = c.getString(3),
-                    group = c.getString(4), epgId = c.getString(5)
+                    group = c.getString(4), epgId = c.getString(5),
+                    userAgent = c.getString(6), referrer = c.getString(7)
                 )
             }
         }
@@ -304,6 +329,32 @@ class Store(context: Context) {
         }
         return sb.toString()
     }
+
+    // ---------- SMB-серверы ----------
+
+    fun smbServers(): List<SmbServer> {
+        val out = mutableListOf<SmbServer>()
+        db.rawQuery("SELECT id,name,base,user,pass FROM smb_servers ORDER BY id", null).use { c ->
+            while (c.moveToNext()) {
+                out += SmbServer(
+                    id = c.getLong(0), name = c.getString(1), base = c.getString(2),
+                    user = c.getString(3).ifEmpty { null }, pass = c.getString(4).ifEmpty { null }
+                )
+            }
+        }
+        return out
+    }
+
+    fun addSmbServer(name: String, base: String, user: String?, pass: String?): Long {
+        val cv = ContentValues().apply {
+            put("name", name); put("base", base)
+            put("user", user ?: ""); put("pass", pass ?: "")
+        }
+        return db.insert("smb_servers", null, cv)
+    }
+
+    fun deleteSmbServer(id: Long) =
+        db.delete("smb_servers", "id=?", arrayOf(id.toString()))
 
     fun close() = db.close()
 }

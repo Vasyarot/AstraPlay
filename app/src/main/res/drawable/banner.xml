@@ -1,15 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
-<vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="320dp" android:height="180dp"
-    android:viewportWidth="320" android:viewportHeight="180">
-    <!-- Фон -->
-    <path android:fillColor="#0B1026" android:pathData="M0,0h320v180H0z" />
-    <!-- Акцентная полоса снизу -->
-    <path android:fillColor="#6C8CFF" android:pathData="M0,172h320v8H0z" />
-    <!-- Круг с кнопкой Play -->
-    <path android:fillColor="#6C8CFF" android:pathData="M232,90 m-40,0 a40,40 0 1,0 80,0 a40,40 0 1,0 -80,0" />
-    <path android:fillColor="#FFFFFFFF" android:pathData="M218,70 L258,90 218,110 Z" />
-    <!-- Звезда -->
-    <path android:fillColor="#6C8CFF"
-        android:pathData="M72,64l6.18,3.73 -1.64,-7.03L82,9.24l-7.19,-0.61L72,2 69.19,8.63 62,9.24l5.46,4.73L65.82,21z" />
+<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="320dp" android:height="180dp" android:viewportWidth="320" android:viewportHeight="180">
+ <path android:fillColor="#101322" android:pathData="M0,0H320V180H0Z" />
+ <path android:fillColor="#1E2543" android:pathData="M320,0L205,180H320Z" />
+ <group android:translateX="8" android:translateY="34">
+  <path android:fillColor="#8196FF" android:pathData="M54,22L84,80H67L54,52L41,80H24Z" />
+  <path android:fillColor="#67E8D3" android:pathData="M49,49L69,61L49,73Z" />
+  <path android:fillColor="#FFFFFF" android:pathData="M80,24L82,30L88,32L82,34L80,40L78,34L72,32L78,30Z" />
+ </group>
+ <path android:fillColor="#00000000" android:strokeColor="#F2F5FA" android:strokeWidth="3" android:strokeLineCap="round" android:strokeLineJoin="round"
+ android:pathData="M116,94L126,64L136,94M120,82H132M166,67C146,55 140,78 155,80C174,82 168,102 146,91M178,64H200M189,64V94M210,94V64H221C236,64 236,79 221,79H210M222,79L233,94M244,94L254,64L264,94M248,82H260" />
+ <path android:fillColor="#00000000" android:strokeColor="#67E8D3" android:strokeWidth="2" android:strokeLineCap="round" android:strokeLineJoin="round"
+ android:pathData="M117,123V109H123C132,109 132,117 123,117H117M139,109V123H149M158,123L163,109L168,123M160,118H166M177,109L182,116L187,109M182,116V123" />
 </vector>

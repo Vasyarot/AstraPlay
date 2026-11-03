@@ -151,6 +151,7 @@
 
     <!-- Плеер: чёрный экран без лишних декораций -->
     <style name="Theme.AstraPlay.Player">
+        <item name="android:windowFullscreen">true</item>
         <item name="android:windowBackground">@color/black</item>
         <item name="android:windowContentTransitions">false</item>
         <item name="colorPrimary">@color/white</item>
