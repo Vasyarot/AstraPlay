@@ -23,7 +23,7 @@ data class SmbServer(
     val user: String?,  // null/пусто — гость
     val pass: String?,
 ) {
-    /** Полный URL с учётными данными (для jcifs и плеера). */
+    /** Полный URL с учётными данными (только для подключения, не для хранения). */
     fun url(path: String = ""): String {
         val cleanBase = base.trimEnd('/')
         val suffix = if (path.startsWith("/")) path else "/$path"
@@ -33,6 +33,13 @@ data class SmbServer(
             val encPass = java.net.URLEncoder.encode(pass ?: "", "UTF-8")
             "smb://$encUser:$encPass@" + cleanBase.removePrefix("smb://") + suffix
         }
+    }
+
+    /** URL без учётных данных — для хранения в записях, истории и бэкапе. */
+    fun urlNoAuth(path: String = ""): String {
+        val cleanBase = base.trimEnd('/')
+        val suffix = if (path.startsWith("/")) path else "/$path"
+        return "$cleanBase$suffix"
     }
 }
 
@@ -167,12 +174,21 @@ class Store(context: Context) {
     // ---------- История ----------
 
     fun addHistory(e: MediaEntry) {
-        // одна запись на элемент — свежая дата поверх старой
+        addHistory(e, System.currentTimeMillis())
+    }
+
+    /** Импорт истории: дата из бэкапа сохраняется, а не подменяется текущей. */
+    private fun addHistory(e: MediaEntry, viewedAt: Long) {
+        // одна запись на элемент — более свежая дата поверх старой
+        val existing = db.rawQuery(
+            "SELECT viewedAt FROM history WHERE kind=? AND itemId=?", arrayOf(e.kind, e.itemId)
+        ).use { c -> if (c.moveToFirst()) c.getLong(0) else -1L }
+        if (existing >= viewedAt) return // локальная запись свежее — не откатываем
         db.execSQL("DELETE FROM history WHERE kind=? AND itemId=?", arrayOf(e.kind, e.itemId))
         val cv = ContentValues().apply {
             put("kind", e.kind); put("itemId", e.itemId); put("title", e.title)
             put("subtitle", e.subtitle); put("poster", e.poster); put("url", e.url)
-            put("viewedAt", System.currentTimeMillis())
+            put("viewedAt", viewedAt)
         }
         db.insert("history", null, cv)
         trimHistory()
@@ -204,11 +220,18 @@ class Store(context: Context) {
     // ---------- Позиции просмотра («Продолжить») ----------
 
     fun savePosition(e: MediaEntry) {
+        savePosition(e, System.currentTimeMillis())
+    }
+
+    /** Импорт позиции: побеждает более свежая запись, её дата сохраняется. */
+    private fun savePosition(e: MediaEntry, updatedAt: Long) {
+        val existing = position(e.itemId)
+        if (existing != null && existing.time >= updatedAt) return // локальная свежее
         val cv = ContentValues().apply {
             put("itemId", e.itemId); put("kind", e.kind); put("title", e.title)
             put("subtitle", e.subtitle); put("poster", e.poster); put("url", e.url)
             put("positionMs", e.positionMs); put("durationMs", e.durationMs)
-            put("updatedAt", System.currentTimeMillis())
+            put("updatedAt", updatedAt)
         }
         db.insertWithOnConflict("positions", null, cv, android.database.sqlite.SQLiteDatabase.CONFLICT_REPLACE)
     }
@@ -219,6 +242,10 @@ class Store(context: Context) {
 
     fun positions(): List<MediaEntry> =
         query("SELECT kind,itemId,title,subtitle,poster,url,'',updatedAt,positionMs,durationMs FROM positions ORDER BY updatedAt DESC LIMIT 50")
+
+    /** Полная выборка для экспорта — без LIMIT, в отличие от [positions] для интерфейса. */
+    fun positionsAll(): List<MediaEntry> =
+        query("SELECT kind,itemId,title,subtitle,poster,url,'',updatedAt,positionMs,durationMs FROM positions ORDER BY updatedAt DESC")
 
     fun deletePosition(itemId: String) =
         db.delete("positions", "itemId=?", arrayOf(itemId))
@@ -241,6 +268,20 @@ class Store(context: Context) {
         }
     }
 
+    /** Все отметки для бэкапа: kind/itemId/title + time=markedAt. */
+    fun watched(): List<MediaEntry> {
+        val out = mutableListOf<MediaEntry>()
+        db.rawQuery("SELECT kind,itemId,title,markedAt FROM watched", null).use { c ->
+            while (c.moveToNext()) {
+                out += MediaEntry(
+                    kind = c.getString(0), itemId = c.getString(1),
+                    title = c.getString(2), time = c.getLong(3)
+                )
+            }
+        }
+        return out
+    }
+
     // ---------- Общее ----------
 
     private fun query(sql: String, args: MutableList<String>? = null): MutableList<MediaEntry> {
@@ -258,10 +299,14 @@ class Store(context: Context) {
         return out
     }
 
-    /** Экспорт всех пользовательских данных в JSON (бэкап). */
+    /**
+     * Экспорт пользовательских данных в JSON (бэкап). Состав: избранное,
+     * история, все позиции просмотра, отметки «Просмотрено», плейлисты
+     * и каналы IPTV. Учётные данные (SMB/WebDAV) в бэкап не попадают.
+     */
     fun exportJson(): String {
         val sb = StringBuilder(4096)
-        sb.append('{')
+        sb.append("{\"v\":").append(BACKUP_VERSION).append(',')
         fun list(name: String, rows: List<MediaEntry>) {
             sb.append('"').append(name).append("\":[")
             rows.forEachIndexed { i, e ->
@@ -270,7 +315,8 @@ class Store(context: Context) {
                     .append("\",\"t\":\"").append(jsonEsc(e.title)).append('"')
                 e.subtitle?.let { sb.append(",\"s\":\"").append(jsonEsc(it)).append('"') }
                 e.poster?.let { sb.append(",\"p\":\"").append(jsonEsc(it)).append('"') }
-                e.url?.let { sb.append(",\"u\":\"").append(jsonEsc(it)).append('"') }
+                // страховка: в бэкапе не должно быть паролей даже в старых записях
+                e.url?.let { sb.append(",\"u\":\"").append(jsonEsc(stripCredentials(it))).append('"') }
                 sb.append(",\"c\":\"").append(jsonEsc(e.category)).append('"')
                     .append(",\"d\":").append(e.time)
                     .append(",\"pos\":").append(e.positionMs)
@@ -281,38 +327,138 @@ class Store(context: Context) {
         }
         list("favorites", favorites())
         list("history", history())
-        list("positions", positions())
-        sb.setLength(sb.length - 1)
-        sb.append('}')
+        list("positions", positionsAll())
+        list("watched", watched())
+        // плейлисты и каналы IPTV
+        sb.append("\"playlists\":[")
+        val pls = playlists()
+        pls.forEachIndexed { i, p ->
+            if (i > 0) sb.append(',')
+            sb.append("{\"id\":").append(p.id)
+                .append(",\"name\":\"").append(jsonEsc(p.name)).append('"')
+                .append(",\"url\":\"").append(jsonEsc(stripCredentials(p.url))).append('"')
+                .append(",\"source\":\"").append(jsonEsc(p.source)).append('"')
+                .append(",\"sort\":").append(p.sortOrder)
+                .append(",\"d\":").append(p.updatedAt).append('}')
+        }
+        sb.append("],\"channels\":[")
+        pls.forEachIndexed { pi, p ->
+            channels(p.id).forEachIndexed { i, ch ->
+                if (pi > 0 || i > 0) sb.append(',')
+                sb.append("{\"p\":").append(ch.playlistId)
+                    .append(",\"name\":\"").append(jsonEsc(ch.name)).append('"')
+                    .append(",\"url\":\"").append(jsonEsc(stripCredentials(ch.url))).append('"')
+                ch.logo?.let { sb.append(",\"logo\":\"").append(jsonEsc(it)).append('"') }
+                ch.group?.let { sb.append(",\"g\":\"").append(jsonEsc(it)).append('"') }
+                ch.epgId?.let { sb.append(",\"epg\":\"").append(jsonEsc(it)).append('"') }
+                ch.userAgent?.let { sb.append(",\"ua\":\"").append(jsonEsc(it)).append('"') }
+                ch.referrer?.let { sb.append(",\"ref\":\"").append(jsonEsc(it)).append('"') }
+                sb.append('}')
+            }
+        }
+        sb.append(']').append('}')
         return sb.toString()
     }
 
-    /** Импорт из JSON бэкапа. */
+    /** Импорт из JSON бэкапа с проверкой типов и слиянием по датам:
+     *  более свежая запись побеждает, дата сохраняется; локально удалённое
+     *  при повторном импорте не воскрешается (только добавление и обновление). */
     fun importJson(json: String) {
+        require(json.length <= 64 * 1024 * 1024) { "Слишком большой файл бэкапа" }
         val root = org.json.JSONObject(json)
         fun rows(name: String): List<MediaEntry> {
             val arr = root.optJSONArray(name) ?: return emptyList()
-            return (0 until arr.length()).map { i ->
-                val o = arr.getJSONObject(i)
+            return (0 until arr.length()).mapNotNull { i ->
+                val o = arr.optJSONObject(i) ?: return@mapNotNull null
+                val kind = o.optString("k").takeIf { it in listOf(
+                    Kinds.CHANNEL, Kinds.MOVIE, Kinds.SERIES, Kinds.LOCAL, Kinds.TORRENT, Kinds.WEB) }
+                    ?: return@mapNotNull null
+                val itemId = o.optString("i")
+                val title = o.optString("t")
+                if (itemId.isEmpty() || title.isEmpty()) return@mapNotNull null
+                val url = o.optString("u").ifEmpty { null }?.takeIf {
+                    it.startsWith("http") || it.startsWith("smb://") || it.startsWith("rtmp")
+                }
                 MediaEntry(
-                    kind = o.getString("k"), itemId = o.getString("i"), title = o.getString("t"),
+                    kind = kind, itemId = itemId, title = title,
                     subtitle = o.optString("s").ifEmpty { null },
                     poster = o.optString("p").ifEmpty { null },
-                    url = o.optString("u").ifEmpty { null },
+                    url = url,
                     category = o.optString("c"), time = o.optLong("d"),
-                    positionMs = o.optLong("pos"), durationMs = o.optLong("dur")
+                    positionMs = o.optLong("pos").coerceIn(0, Long.MAX_VALUE),
+                    durationMs = o.optLong("dur").coerceIn(0, Long.MAX_VALUE),
                 )
             }
         }
         db.beginTransaction()
         try {
-            rows("favorites").forEach { addFavorite(it) }
-            rows("history").forEach { addHistory(it) }
-            rows("positions").forEach { savePosition(it) }
+            // избранное: только добавление недостающих — удалённое не воскрешается
+            rows("favorites").forEach { e ->
+                if (!db.rawQuery("SELECT 1 FROM favorites WHERE kind=? AND itemId=? AND category=?",
+                        arrayOf(e.kind, e.itemId, e.category)).use { it.moveToFirst() }) {
+                    addFavorite(e.copy(time = 0))
+                }
+            }
+            // история и позиции: побеждает более свежая дата, дата сохраняется
+            rows("history").forEach { addHistory(it, it.time) }
+            rows("positions").forEach { savePosition(it, it.time) }
+            // отметки только проставляем: «снять просмотр» при объединении бэкапа не делаем
+            rows("watched").forEach {
+                if (!db.rawQuery("SELECT 1 FROM watched WHERE itemId=?", arrayOf(it.itemId)).use { c -> c.moveToFirst() }) {
+                    setWatched(it.itemId, it.kind, it.title, true)
+                    db.execSQL("UPDATE watched SET markedAt=? WHERE itemId=?",
+                        arrayOf(if (it.time > 0) it.time else System.currentTimeMillis(), it.itemId))
+                }
+            }
+            // плейлисты и каналы IPTV: дополняем, не удаляя локальные
+            root.optJSONArray("playlists")?.let { arr ->
+                val existing = playlists()
+                (0 until arr.length()).forEach { i ->
+                    val o = arr.optJSONObject(i) ?: return@forEach
+                    val name = o.optString("name")
+                    val url = o.optString("url")
+                    if (name.isEmpty() || url.isEmpty()) return@forEach
+                    if (existing.none { it.name == name && it.url == url }) {
+                        val id = addPlaylist(name, url, o.optString("source"))
+                        o.optLong("d").takeIf { it > 0 }?.let {
+                            db.execSQL("UPDATE playlists SET updatedAt=? WHERE id=?", arrayOf(it, id))
+                        }
+                    }
+                }
+            }
+            root.optJSONArray("channels")?.let { arr ->
+                val existing = playlists()
+                (0 until arr.length()).forEach { i ->
+                    val o = arr.optJSONObject(i) ?: return@forEach
+                    val pl = existing.firstOrNull { it.id == o.optLong("p") } ?: return@forEach
+                    val name = o.optString("name")
+                    val url = o.optString("url")
+                    if (name.isEmpty() || url.isEmpty()) return@forEach
+                    val already = channels(pl.id).any { it.name == name && it.url == url }
+                    if (!already) {
+                        replaceChannels(pl.id, channels(pl.id) + Channel(
+                            id = 0, playlistId = pl.id, name = name, url = url,
+                            logo = o.optString("logo").ifEmpty { null },
+                            group = o.optString("g").ifEmpty { null },
+                            epgId = o.optString("epg").ifEmpty { null },
+                            userAgent = o.optString("ua").ifEmpty { null },
+                            referrer = o.optString("ref").ifEmpty { null },
+                        ))
+                    }
+                }
+            }
             db.setTransactionSuccessful()
         } finally {
             db.endTransaction()
         }
+    }
+
+    /** Убирает учётные данные из smb://user:pass@host — в хранилище им не место. */
+    private fun stripCredentials(url: String): String =
+        url.replace(Regex("^(smb://)([^:/@]+):([^@]*)@"), "$1")
+
+    private companion object {
+        const val BACKUP_VERSION = 2
     }
 
     private fun jsonEsc(s: String): String {

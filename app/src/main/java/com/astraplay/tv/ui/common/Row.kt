@@ -41,6 +41,9 @@ class MediaRow<T : Any> @JvmOverloads constructor(
         titleView.text = text
     }
 
+    /** Лента карточек ряда — для ручной вертикальной навигации по экрану. */
+    fun cardsView(): RecyclerView = rv
+
     fun titleColorDefault() {
         titleView.setTextColor(ThemeManager.colorOf(context, android.R.attr.textColorPrimary))
     }
@@ -62,28 +65,26 @@ class MediaRow<T : Any> @JvmOverloads constructor(
     }
 }
 
-private class RowVH(val card: PosterCard) : RecyclerView.ViewHolder(card)
-
 private class RowAdapter<T>(
     private var items: List<T>,
     private val mode: Int,
     private val binder: (PosterCard, T) -> Unit,
     private val click: (T) -> Unit,
     private val longClick: ((T) -> Boolean)?,
-) : RecyclerView.Adapter<RowVH>() {
+) : RecyclerView.Adapter<CardVH>() {
 
-    override fun onCreateViewHolder(parent: android.view.ViewGroup, viewType: Int): RowVH {
+    override fun onCreateViewHolder(parent: android.view.ViewGroup, viewType: Int): CardVH {
         val card = PosterCard(parent.context)
         card.applyMode(mode)
         card.setMargins()
-        return RowVH(card)
+        return CardVH(card)
     }
 
     override fun getItemViewType(position: Int): Int = mode
 
     override fun getItemCount(): Int = items.size
 
-    override fun onBindViewHolder(holder: RowVH, position: Int) {
+    override fun onBindViewHolder(holder: CardVH, position: Int) {
         val item = items[position]
         holder.card.applyMode(mode)
         holder.card.layoutParams = RecyclerView.LayoutParams(holder.card.layoutParams).apply {

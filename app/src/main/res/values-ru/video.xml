@@ -1,0 +1,30 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="video_source_player">Плеер источника</string>
+    <string name="video_loading">Подключаем видео…</string>
+    <string name="video_native_unavailable">Источник предоставляет только собственный веб-плеер. Доступный прямой поток не найден; нативный просмотр этого видео пока недоступен.</string>
+  <string name="video_quality">Качество видео</string>
+  <string name="video_quality_value">До %1$dp</string>
+  <string name="video_quality_economy">Экономичный • до 720p</string>
+  <string name="video_quality_fullhd">До 1080p • больше нагрузка на ТВ</string>
+  <string name="video_menu">Настройки</string>
+  <string name="video_previous">Предыдущая</string>
+  <string name="video_next">Следующая</string>
+  <string name="video_retry">Повторить</string>
+  <string name="video_close">Назад</string>
+  <string name="video_invalid_address">Не удалось прочитать адрес видео.</string>
+  <string name="video_open_failed">Видео не удалось открыть. Возможно, источник требует входа или использует неподдерживаемый формат.</string>
+  <string name="video_decoder_error">Телевизор не смог декодировать видео. Попробуйте качество ниже или другую звуковую дорожку.</string>
+  <string name="video_network_error">Соединение с видео прервано. Проверьте сеть и нажмите «Повторить».</string>
+  <string name="source_card_back">Назад</string>
+  <string name="source_card_expand">Развернуть или свернуть описание</string>
+  <string name="source_card_movie">Фильм</string>
+  <string name="source_card_series">Сериал</string>
+  <string name="source_card_watch">Смотреть</string>
+  <string name="source_card_minutes">%1$d мин</string>
+  <string name="source_card_episode_count">Серии: %1$d</string>
+  <string name="source_card_episode_list">Список серий</string>
+  <string name="source_card_no_episodes">Источник пока не предоставил список серий.</string>
+  <string name="source_card_season_error">Не удалось загрузить сезон. Выберите его повторно.</string>
+  <string name="source_card_season_episode">Сезон %1$d · серия %2$d</string>
+</resources>

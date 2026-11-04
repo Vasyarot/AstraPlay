@@ -10,6 +10,7 @@ import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.astraplay.tv.R
+import com.astraplay.tv.core.LastScreen
 import com.astraplay.tv.core.ServiceLocator
 import com.astraplay.tv.data.tmdb.CatalogSection
 import com.astraplay.tv.data.tmdb.TmdbItem
@@ -21,6 +22,7 @@ import com.astraplay.tv.ui.common.withAlpha
 import com.astraplay.tv.ui.nav.Nav
 import com.astraplay.tv.ui.theme.ThemeManager
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.Locale
@@ -40,6 +42,9 @@ class CatalogActivity : AppCompatActivity() {
     private var items = mutableListOf<TmdbItem>()
     private var loading = false
     private var hasMore = true
+    private var loadJob: Job? = null
+    /** Поколение запроса: ответ старого раздела не должен попасть в новый. */
+    private var generation = 0
 
     private val tmdb get() = ServiceLocator.tmdb
 
@@ -69,6 +74,7 @@ class CatalogActivity : AppCompatActivity() {
             layoutManager = GridLayoutManager(this@CatalogActivity, 6)
             setHasFixedSize(true)
             setItemViewCacheSize(10)
+            itemAnimator = null // анимации вставки на слабых приставках дают рывки прокрутки
         }
         root.addView(grid, LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
@@ -97,10 +103,19 @@ class CatalogActivity : AppCompatActivity() {
         }
     }
 
+    override fun onResume() {
+        super.onResume()
+        // процесс могли убить в фоне — запоминаем каталог для восстановления ([[LastScreen]])
+        LastScreen.save(this, CatalogActivity::class.java)
+    }
+
     private fun reload() {
+        generation++
+        loadJob?.cancel()
         items.clear()
         page = 1
         hasMore = true
+        loading = false
         grid.adapter?.notifyDataSetChanged()
         loadPage()
     }
@@ -109,11 +124,14 @@ class CatalogActivity : AppCompatActivity() {
         if (loading || !tmdb.available) return
         loading = true
         status.text = getString(R.string.loading)
-        lifecycleScope.launch {
+        val gen = generation
+        loadJob = lifecycleScope.launch {
             val res = withContext(Dispatchers.IO) { tmdb.section(section, page) }
+            if (gen != generation) return@launch // раздел сменился, пока грузился ответ
             loading = false
             res.fold(
                 onSuccess = { list ->
+                    if (gen != generation) return@launch
                     status.text = ""
                     items.addAll(list)
                     hasMore = list.size >= 20
@@ -124,7 +142,7 @@ class CatalogActivity : AppCompatActivity() {
                         grid.adapter?.notifyItemRangeInserted(items.size - list.size, list.size)
                     }
                 },
-                onFailure = { status.text = getString(R.string.network_error) }
+                onFailure = { if (gen == generation) status.text = getString(R.string.network_error) }
             )
         }
     }

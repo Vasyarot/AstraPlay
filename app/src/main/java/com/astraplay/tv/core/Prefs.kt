@@ -36,6 +36,42 @@ class Prefs(context: Context) {
         get() = sp.getInt(KEY_SEEK_STEP, 10)
         set(v) = sp.edit().putInt(KEY_SEEK_STEP, v).apply()
 
+    /** Таймер сна «как в системе»: пауза видео после таймаута экрана Android. */
+    var sleepSyncSystem: Boolean
+        get() = sp.getBoolean(KEY_SLEEP_SYNC, false)
+        set(v) = sp.edit().putBoolean(KEY_SLEEP_SYNC, v).apply()
+
+    // ---- Таймер включения ----
+    // 0 — выкл, 1 — ежедневно в wakeHour:wakeMinute, 2 — одноразово в wakeOnceAt
+    var wakeMode: Int
+        get() = sp.getInt(KEY_WAKE_MODE, 0)
+        set(v) = sp.edit().putInt(KEY_WAKE_MODE, v).apply()
+
+    var wakeHour: Int
+        get() = sp.getInt(KEY_WAKE_HOUR, 7)
+        set(v) = sp.edit().putInt(KEY_WAKE_HOUR, v).apply()
+
+    var wakeMinute: Int
+        get() = sp.getInt(KEY_WAKE_MINUTE, 0)
+        set(v) = sp.edit().putInt(KEY_WAKE_MINUTE, v).apply()
+
+    var wakeDelayMin: Int // длительность одноразового таймера (для подстановки в диалог)
+        get() = sp.getInt(KEY_WAKE_DELAY, 30)
+        set(v) = sp.edit().putInt(KEY_WAKE_DELAY, v).apply()
+
+    var wakeOnceAt: Long // момент срабатывания одноразового таймера
+        get() = sp.getLong(KEY_WAKE_ONCE_AT, 0L)
+        set(v) = sp.edit().putLong(KEY_WAKE_ONCE_AT, v).apply()
+
+    /** Канал для таймера; пусто — самый первый канал первого плейлиста. */
+    var wakeChannelUrl: String
+        get() = sp.getString(KEY_WAKE_CHANNEL_URL, "") ?: ""
+        set(v) = sp.edit().putString(KEY_WAKE_CHANNEL_URL, v).apply()
+
+    var wakeChannelTitle: String
+        get() = sp.getString(KEY_WAKE_CHANNEL_TITLE, "") ?: ""
+        set(v) = sp.edit().putString(KEY_WAKE_CHANNEL_TITLE, v).apply()
+
     // ---- Система ----
     var autostart: Boolean
         get() = sp.getBoolean(KEY_AUTOSTART, false)
@@ -66,6 +102,11 @@ class Prefs(context: Context) {
         get() = sp.getString(KEY_WEBDAV_PASS, "") ?: ""
         set(v) = sp.edit().putString(KEY_WEBDAV_PASS, v).apply()
 
+    /** Осознанное разрешение на HTTP без шифрования (для домашнего сервера). */
+    var webdavAllowHttp: Boolean
+        get() = sp.getBoolean(KEY_WEBDAV_ALLOW_HTTP, false)
+        set(v) = sp.edit().putBoolean(KEY_WEBDAV_ALLOW_HTTP, v).apply()
+
     fun clearAll() {
         sp.edit().clear().apply()
     }
@@ -77,11 +118,20 @@ class Prefs(context: Context) {
         const val KEY_BUFFER = "hls_buffer"
         const val KEY_AUTO_NEXT = "autoplay_next"
         const val KEY_SEEK_STEP = "seek_step"
+        const val KEY_SLEEP_SYNC = "sleep_sync_system"
+        const val KEY_WAKE_MODE = "wake_mode"
+        const val KEY_WAKE_HOUR = "wake_hour"
+        const val KEY_WAKE_MINUTE = "wake_minute"
+        const val KEY_WAKE_DELAY = "wake_delay_min"
+        const val KEY_WAKE_ONCE_AT = "wake_once_at"
+        const val KEY_WAKE_CHANNEL_URL = "wake_channel_url"
+        const val KEY_WAKE_CHANNEL_TITLE = "wake_channel_title"
         const val KEY_AUTOSTART = "autostart"
         const val KEY_LAST_PLAYLIST = "last_playlist"
         const val KEY_WEBDAV_URL = "webdav_url"
         const val KEY_WEBDAV_USER = "webdav_user"
         const val KEY_WEBDAV_PASS = "webdav_pass"
+        const val KEY_WEBDAV_ALLOW_HTTP = "webdav_allow_http"
         const val DEFAULT_TMDB_KEY = ""
     }
 }

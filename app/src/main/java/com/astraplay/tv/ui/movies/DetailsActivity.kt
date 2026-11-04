@@ -16,6 +16,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.astraplay.tv.R
+import com.astraplay.tv.core.LastScreen
 import com.astraplay.tv.core.ServiceLocator
 import com.astraplay.tv.data.db.Kinds
 import com.astraplay.tv.data.db.MediaEntry
@@ -25,6 +26,7 @@ import com.astraplay.tv.ui.common.Dialogs
 import com.astraplay.tv.ui.common.dp
 import com.astraplay.tv.ui.common.gone
 import com.astraplay.tv.ui.common.roundedBg
+import com.astraplay.tv.ui.common.visible
 import com.astraplay.tv.ui.common.withAlpha
 import com.astraplay.tv.ui.nav.Nav
 import com.astraplay.tv.ui.theme.ThemeManager
@@ -51,6 +53,8 @@ class DetailsActivity : AppCompatActivity() {
     private lateinit var overview: TextView
     private lateinit var buttons: LinearLayout
     private lateinit var seasonsList: RecyclerView
+    private lateinit var similarTitle: TextView
+    private lateinit var similarRow: com.astraplay.tv.ui.common.MediaRow<com.astraplay.tv.data.tmdb.TmdbItem>
     private lateinit var backdrop: ImageView
     private lateinit var titleView: TextView
 
@@ -138,7 +142,29 @@ class DetailsActivity : AppCompatActivity() {
         body.addView(seasonsList, LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
 
+        // Ряд «Похожее»: заполняется после загрузки детали
+        similarTitle = TextView(this).apply {
+            text = getString(R.string.similar)
+            textSize = 16f
+            setTypeface(typeface, android.graphics.Typeface.BOLD)
+            setPadding(0, 18.dp(this@DetailsActivity), 0, 6.dp(this@DetailsActivity))
+            setTextColor(ThemeManager.colorOf(this@DetailsActivity, android.R.attr.textColorPrimary))
+            gone()
+        }
+        body.addView(similarTitle)
+        similarRow = com.astraplay.tv.ui.common.MediaRow(this)
+        similarRow.gone()
+        body.addView(similarRow, LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+
         load()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // процесс могли убить в фоне — запоминаем карточку для восстановления ([[LastScreen]])
+        LastScreen.save(this, DetailsActivity::class.java,
+            org.json.JSONObject().put("itemId", itemId).put("mediaType", mediaType))
     }
 
     private fun load() {
@@ -182,6 +208,26 @@ class DetailsActivity : AppCompatActivity() {
         favBtn = btn(favLabel()) { toggleFav(d) }
         watchedBtn = btn(watchedLabel()) { toggleWatched(d) }
         btn(getString(R.string.section_torrents)) { Nav.openTorrent(this, d.item.title) }
+
+        loadSimilar(d)
+    }
+
+    /** Официальные рекомендации TMDB: горизонтальный ряд под сезонами. */
+    private fun loadSimilar(d: TmdbDetail) {
+        lifecycleScope.launch {
+            val recs = withContext(Dispatchers.IO) {
+                tmdb.recommendations(itemId, mediaType).getOrDefault(emptyList())
+            }
+            if (recs.isEmpty()) return@launch
+            similarTitle.visible()
+            similarRow.setData(recs.take(20), com.astraplay.tv.ui.common.PosterCard.MODE_POSTER,
+                binder = { card, item ->
+                    card.loadPoster(tmdb.posterUrl(item.posterPath))
+                    card.label.text = item.title
+                    card.showBadge(if (item.rating > 0) String.format(Locale.US, "%.1f", item.rating) else null)
+                },
+                click = { item -> Nav.openDetails(this@DetailsActivity, item) })
+        }
     }
 
     private fun favLabel(): String =
@@ -223,15 +269,31 @@ class DetailsActivity : AppCompatActivity() {
             Toast.makeText(this, getString(R.string.no_results), Toast.LENGTH_SHORT).show()
             return
         }
-        val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://www.youtube.com/watch?v=$key"))
-        runCatching { startActivity(intent) }
-            .onFailure { Toast.makeText(this, getString(R.string.error), Toast.LENGTH_SHORT).show() }
+        // официальный IFrame-плеер YouTube внутри приложения
+        startActivity(android.content.Intent(this,
+            com.astraplay.tv.player.YouTubeActivity::class.java).putExtra("videoId", key))
     }
 
     private fun showSeasonPicker(d: TmdbDetail) {
         val names = d.seasons.map { it.name }
         Dialogs.choice(this, getString(R.string.seasons), names, 0) { idx ->
-            showEpisodes(d, d.seasons[idx])
+            val season = d.seasons[idx]
+            Toast.makeText(this, getString(R.string.loading), Toast.LENGTH_SHORT).show()
+            lifecycleScope.launch {
+                val res = withContext(Dispatchers.IO) { tmdb.season(itemId, season.number) }
+                res.fold(
+                    onSuccess = { full ->
+                        if (full.episodes.isEmpty()) {
+                            Toast.makeText(this@DetailsActivity, getString(R.string.no_results), Toast.LENGTH_SHORT).show()
+                        } else {
+                            showEpisodes(d, full)
+                        }
+                    },
+                    onFailure = {
+                        Toast.makeText(this@DetailsActivity, getString(R.string.network_error), Toast.LENGTH_SHORT).show()
+                    }
+                )
+            }
         }
     }
 

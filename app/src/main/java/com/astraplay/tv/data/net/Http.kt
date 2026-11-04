@@ -9,6 +9,11 @@ import java.util.concurrent.TimeUnit
 /** Единый OkHttp-клиент: компактный пул соединений и таймауты под слабую сеть. */
 class Http(prefs: Prefs) {
 
+    companion object {
+        /** Собственный UA приложения: часть сайтов отдаёт каталог только не-браузерным клиентам. */
+        const val USER_AGENT = "AstraPlay/1.5"
+    }
+
     val client: OkHttpClient = OkHttpClient.Builder()
         .connectTimeout(10, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
@@ -18,7 +23,7 @@ class Http(prefs: Prefs) {
 
     fun get(url: String, headers: Map<String, String> = emptyMap()): String {
         val rb = Request.Builder().url(url)
-            .header("User-Agent", "AstraPlay/1.0")
+            .header("User-Agent", USER_AGENT)
         headers.forEach { (k, v) -> rb.header(k, v) }
         client.newCall(rb.build()).execute().use { resp ->
             if (!resp.isSuccessful) error("HTTP ${resp.code} for $url")

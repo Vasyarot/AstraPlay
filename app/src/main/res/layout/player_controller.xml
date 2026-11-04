@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Кастомный контроллер PlayerActivity: шапка с названием, акцентный таймбар,
+     кнопка избранного в нижней панели. Идентификаторы exo_* обязательны —
+     их заполняет PlayerView. -->
+<merge xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <View android:id="@id/exo_controls_background"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:background="#66000000" />
+
+    <!-- шапка: название и подзаголовок -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top"
+        android:orientation="vertical"
+        android:paddingStart="24dp"
+        android:paddingTop="16dp"
+        android:paddingEnd="24dp"
+        android:paddingBottom="20dp"
+        android:background="@drawable/player_scrim_top">
+
+        <TextView android:id="@+id/player_title"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textSize="21sp"
+            android:textStyle="bold"
+            android:textColor="#FFFFFF"
+            android:maxLines="1"
+            android:ellipsize="end" />
+
+        <TextView android:id="@+id/player_subtitle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textSize="13sp"
+            android:textColor="#BEC7DA"
+            android:maxLines="1"
+            android:ellipsize="end" />
+    </LinearLayout>
+
+    <!-- Two compact rows keep controls separate from time and readable on TV. -->
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:layout_gravity="bottom" android:orientation="vertical"
+        android:paddingStart="18dp" android:paddingEnd="18dp" android:paddingTop="20dp" android:paddingBottom="12dp"
+        android:background="@drawable/player_scrim_bottom" android:layoutDirection="ltr">
+    <!-- центр: перемотка и play/pause -->
+    <LinearLayout android:id="@id/exo_center_controls"
+        android:layout_width="wrap_content"
+        android:layout_height="64dp"
+        android:layout_gravity="center_horizontal"
+        android:gravity="center"
+        android:clipToPadding="false"
+        android:layoutDirection="ltr">
+
+        <ImageButton android:id="@id/exo_prev"
+            style="@style/ExoStyledControls.Button.Center.Previous" />
+
+        <include layout="@layout/exo_player_control_rewind_button" />
+
+        <ImageButton android:id="@id/exo_play_pause"
+            style="@style/ExoStyledControls.Button.Center.PlayPause" />
+
+        <include layout="@layout/exo_player_control_ffwd_button" />
+
+        <ImageButton android:id="@id/exo_next"
+            style="@style/ExoStyledControls.Button.Center.Next" />
+    </LinearLayout>
+        <LinearLayout android:layout_width="match_parent" android:layout_height="32dp" android:gravity="center_vertical">
+            <TextView android:id="@id/exo_position" style="@style/ExoStyledControls.TimeText.Position" />
+            <androidx.media3.ui.DefaultTimeBar android:id="@id/exo_progress"
+                android:layout_width="0dp" android:layout_weight="1" android:layout_height="32dp"
+                android:layout_marginStart="12dp" android:layout_marginEnd="12dp" android:focusable="true"
+                app:played_color="#7C9CFF" app:scrubber_color="#FFFFFF" app:unplayed_color="#40FFFFFF"
+                app:buffered_color="#70FFFFFF" app:bar_height="4dp" app:touch_target_height="32dp" />
+            <TextView android:id="@id/exo_duration" style="@style/ExoStyledControls.TimeText.Duration" />
+        </LinearLayout>
+        <HorizontalScrollView android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:fillViewport="true" android:scrollbars="none" android:focusable="false">
+            <LinearLayout android:layout_width="wrap_content" android:layout_height="wrap_content" android:gravity="center">
+                <TextView android:id="@+id/player_previous" style="@style/AstraPlayerButton" android:text="@string/video_previous" />
+                <TextView android:id="@+id/player_next" style="@style/AstraPlayerButton" android:text="@string/video_next" />
+                <TextView android:id="@+id/player_quality" style="@style/AstraPlayerButton" android:text="@string/video_quality" />
+                <TextView android:id="@+id/player_menu" style="@style/AstraPlayerButton" android:text="@string/video_menu" />
+                <TextView android:id="@+id/player_fav" style="@style/AstraPlayerButton" android:text="@string/add_to_fav" />
+            </LinearLayout>
+        </HorizontalScrollView>
+    </LinearLayout>
+
+</merge>

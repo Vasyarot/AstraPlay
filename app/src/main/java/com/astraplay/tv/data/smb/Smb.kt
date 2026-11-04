@@ -53,4 +53,22 @@ object SmbClient {
 
     fun isVideo(name: String): Boolean =
         name.substringAfterLast('.', "").lowercase() in VIDEO_EXT
+
+    /**
+     * Подставляет учётные данные из списка серверов в адрес без пароля.
+     * В записях (история, позиции, бэкап) SMB-ссылки хранятся без пароля;
+     * он добавляется только на момент подключения.
+     */
+    fun withCredentials(url: String, servers: List<com.astraplay.tv.data.db.SmbServer>): String {
+        if (!url.startsWith("smb://") || url.contains("@")) return url
+        val path = url.removePrefix("smb://")
+        for (server in servers) {
+            val base = server.base.removePrefix("smb://").trimEnd('/')
+            if (path.startsWith(base)) {
+                val relative = path.removePrefix(base)
+                return server.url(relative.ifEmpty { "/" })
+            }
+        }
+        return url
+    }
 }

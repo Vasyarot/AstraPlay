@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <item name="row_label" type="id" />
+    <item name="row_name" type="id" />
+    <item name="row_sublabel" type="id" />
+    <item name="row_cards" type="id" />
+</resources>

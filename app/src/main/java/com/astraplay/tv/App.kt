@@ -1,11 +1,14 @@
 package com.astraplay.tv
 
+import android.app.Activity
 import android.app.Application
 import android.content.Context
+import android.os.Bundle
 import coil.ImageLoader
 import coil.ImageLoaderFactory
 import coil.decode.BitmapFactoryDecoder
 import coil.request.CachePolicy
+import com.astraplay.tv.core.LastScreen
 import com.astraplay.tv.core.ServiceLocator
 
 /**
@@ -17,12 +20,23 @@ class App : Application(), ImageLoaderFactory {
     override fun onCreate() {
         super.onCreate()
         ServiceLocator.init(this)
+        // Фиксируем момент сворачивания: после убийства фонового процесса
+        // главный экран решает, восстанавливать ли последний экран ([[LastScreen]]).
+        registerActivityLifecycleCallbacks(object : ActivityLifecycleCallbacks {
+            override fun onActivityPaused(activity: Activity) = LastScreen.markPaused(this@App)
+            override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) {}
+            override fun onActivityStarted(activity: Activity) {}
+            override fun onActivityResumed(activity: Activity) {}
+            override fun onActivityStopped(activity: Activity) {}
+            override fun onActivitySaveInstanceState(activity: Activity, outState: Bundle) {}
+            override fun onActivityDestroyed(activity: Activity) {}
+        })
     }
 
     /**
      * Лёгкий ImageLoader для слабых устройств:
      *  - RGB_565: каждый постер занимает вдвое меньше памяти;
-     *  - кэш памяти 12% вместо стандартных 25%;
+     *  - кэш памяти ограничен 8 МБ;
      *  - дисковый кэш 64 МБ;
      *  - без crossfade (лишние кадры анимации = лишний GPU-трафик).
      */
@@ -36,7 +50,7 @@ class App : Application(), ImageLoaderFactory {
             }
             .memoryCache {
                 coil.memory.MemoryCache.Builder(this)
-                    .maxSizePercent(0.12)
+                    .maxSizeBytes(8 * 1024 * 1024)
                     .build()
             }
             .diskCache {

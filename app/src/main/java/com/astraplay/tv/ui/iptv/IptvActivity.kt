@@ -11,6 +11,7 @@ import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.astraplay.tv.R
+import com.astraplay.tv.core.LastScreen
 import com.astraplay.tv.core.ServiceLocator
 import com.astraplay.tv.data.db.Kinds
 import com.astraplay.tv.data.db.MediaEntry
@@ -82,6 +83,13 @@ class IptvActivity : AppCompatActivity() {
         playlistId = intent.getLongExtra("playlistId", -1L)
         buildUi()
         loadPlaylistsAndChannels()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // процесс могли убить в фоне — запоминаем плейлист для восстановления ([[LastScreen]])
+        LastScreen.save(this, IptvActivity::class.java,
+            org.json.JSONObject().put("playlistId", playlistId))
     }
 
     // ---------- UI ----------
@@ -254,6 +262,42 @@ class IptvActivity : AppCompatActivity() {
         groupsRow.adapter = adapter
     }
 
+    /**
+     * Ручная вертикальная навигация по сетке каналов: системный focus search
+     * при быстрой прокрутке «срывается» на панель действий над сеткой.
+     */
+    override fun dispatchKeyEvent(event: android.view.KeyEvent): Boolean {
+        if (event.action == android.view.KeyEvent.ACTION_DOWN &&
+            (event.keyCode == android.view.KeyEvent.KEYCODE_DPAD_DOWN || event.keyCode == android.view.KeyEvent.KEYCODE_DPAD_UP) &&
+            channelsGrid.hasFocus()) {
+            val lm = channelsGrid.layoutManager as? GridLayoutManager ?: return super.dispatchKeyEvent(event)
+            val child = channelsGrid.focusedChild ?: return super.dispatchKeyEvent(event)
+            val pos = lm.getPosition(child)
+            val span = lm.spanCount
+            val count = channelsGrid.adapter?.itemCount ?: return super.dispatchKeyEvent(event)
+            val target = pos + if (event.keyCode == android.view.KeyEvent.KEYCODE_DPAD_DOWN) span else -span
+            if (target < 0) { focusGroupsColumn(); return true }
+            if (target >= count) return true // конец списка — не даём уйти в панель действий
+            channelsGrid.scrollToPosition(target)
+            channelsGrid.post {
+                (channelsGrid.findViewHolderForAdapterPosition(target)?.itemView
+                    ?: channelsGrid.getChildAt(channelsGrid.childCount - 1))?.requestFocus()
+            }
+            return true
+        }
+        return super.dispatchKeyEvent(event)
+    }
+
+    /** Вверх из первого ряда сетки — в колонку групп, на выбранный пункт. */
+    private fun focusGroupsColumn() {
+        val idx = if (selectedGroup == null) 0
+        else (listOf(getString(R.string.all)) + groups).indexOf(selectedGroup).coerceAtLeast(0)
+        groupsRow.scrollToPosition(idx)
+        groupsRow.post {
+            (groupsRow.findViewHolderForAdapterPosition(idx)?.itemView ?: groupsRow.getChildAt(0))?.requestFocus()
+        }
+    }
+
     private fun showChannels() {
         val filtered = channels.filter { (selectedGroup == null || it.displayGroup == selectedGroup) &&
             channelTitle(it).contains(searchQuery, ignoreCase = true) && (!hideFailed || health(it) != -1) }
@@ -277,6 +321,13 @@ class IptvActivity : AppCompatActivity() {
             )
             lifecycleScope.launch(Dispatchers.IO) { store.addHistory(entry) }
             Nav.play(this, entry, playlistId = playlistId)
+        }
+        // при загрузке фокус сразу на первом канале (если пользователь ещё не наводил фокус)
+        if (!channelsGrid.hasFocus() && !groupsRow.hasFocus()) {
+            channelsGrid.post {
+                (channelsGrid.findViewHolderForAdapterPosition(0)?.itemView
+                    ?: channelsGrid.getChildAt(0))?.requestFocus()
+            }
         }
     }
 

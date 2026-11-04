@@ -68,7 +68,11 @@ object Nav {
         nextItemId: String? = null,
         playlistId: Long = -1L,
     ) = if (entry.kind == com.astraplay.tv.data.db.Kinds.WEB) {
-        context.startActivity(Intent(context, com.astraplay.tv.ui.movies.SourceWebActivity::class.java)
+        // записи «web» — это адреса: поддержанные карточки открываются нативно,
+        // остальное — во встроенном браузере
+        if (entry.url != null && com.astraplay.tv.data.sources.OnlineSources.validWebUrl(entry.url)) {
+            openSourceCard(context, entry.url, entry.title, entry.poster)
+        } else context.startActivity(Intent(context, com.astraplay.tv.ui.movies.SourceWebActivity::class.java)
             .putExtra("url", entry.url).putExtra("title", entry.title))
     } else context.startActivity(Intent(context, if (entry.kind == com.astraplay.tv.data.db.Kinds.CHANNEL)
         com.astraplay.tv.player.LivePlayerActivity::class.java else PlayerActivity::class.java).apply {
@@ -85,4 +89,21 @@ object Nav {
         putExtra("nextUrl", nextUrl)
         putExtra("nextItemId", nextItemId)
     })
+
+    /** Нативная карточка фильма/сериала источника. */
+    fun openSourceCard(context: Context, url: String, title: String?, poster: String?) =
+        context.startActivity(Intent(context, com.astraplay.tv.ui.movies.SourceDetailsActivity::class.java)
+            .putExtra("url", url)
+            .putExtra("title", title ?: "")
+            .putExtra("poster", poster ?: ""))
+
+    /** Explicit video route; WEB entries must not loop back to their description. */
+    fun playVideoQueue(context: Context, key: String, index: Int, fallback: com.astraplay.tv.player.VideoItem, allowEmbed: Boolean = true, preferEmbed: Boolean = false) =
+        context.startActivity(Intent(context, PlayerActivity::class.java)
+            .putExtra("queueKey", key).putExtra("queueIndex", index)
+            .putExtra("itemId", fallback.itemId).putExtra("kind", fallback.kind)
+            .putExtra("title", fallback.title).putExtra("subtitle", fallback.subtitle)
+            .putExtra("poster", fallback.poster).putExtra("url", fallback.url)
+            .putExtra("pageUrl", fallback.pageUrl).putExtra("referer", fallback.referer)
+            .putExtra("playKind", fallback.playKind.name).putExtra("allowEmbed", allowEmbed).putExtra("preferEmbed", preferEmbed))
 }

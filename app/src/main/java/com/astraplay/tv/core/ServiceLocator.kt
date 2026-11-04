@@ -25,6 +25,11 @@ object ServiceLocator {
 
     val http: Http by lazy { Http(prefs) }
 
+    /** CookieJar asks WebView's cookie store for each destination, including redirected CDN requests. */
+    val sourceHttpClient by lazy {
+        http.client.newBuilder().cookieJar(com.astraplay.tv.data.sources.SourceSession(android.webkit.CookieManager.getInstance())).build()
+    }
+
     val store: Store by lazy { Store(appContext) }
 
     val epg: EpgStore by lazy { EpgStore(http) }
@@ -34,4 +39,13 @@ object ServiceLocator {
     val archive: ArchiveSource by lazy { ArchiveSource(http) }
 
     val media: MediaStoreSource by lazy { MediaStoreSource(appContext) }
+
+    val videoQueues by lazy { com.astraplay.tv.player.VideoQueueStore(java.io.File(appContext.filesDir, "video_queues")) }
+
+    /** Загрузчик нативных карточек: процессный — кэш карточек переживает пересоздание экранов. */
+    val sourceDetailsLoader by lazy {
+        com.astraplay.tv.data.sources.SourceDetailsLoader(
+            sourceHttpClient, com.astraplay.tv.data.net.Http.USER_AGENT,
+            java.io.File(appContext.cacheDir, "source_details"))
+    }
 }

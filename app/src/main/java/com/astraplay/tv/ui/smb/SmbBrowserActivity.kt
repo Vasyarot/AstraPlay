@@ -170,7 +170,8 @@ class SmbBrowserActivity : AppCompatActivity() {
     }
 
     private fun play(server: SmbServer, file: FileRow) {
-        val url = server.url(currentDir + "/" + file.name)
+        // пароль в записях не хранится: только сервер и путь, данные подставятся при подключении
+        val url = server.urlNoAuth(currentDir + "/" + file.name)
         val name = file.name.substringBeforeLast('.')
         val entry = MediaEntry(
             kind = Kinds.LOCAL, itemId = "smb_" + url.hashCode(), title = name,

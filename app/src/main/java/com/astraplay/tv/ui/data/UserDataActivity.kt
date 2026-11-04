@@ -10,6 +10,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.astraplay.tv.R
+import com.astraplay.tv.core.LastScreen
 import com.astraplay.tv.core.ServiceLocator
 import com.astraplay.tv.data.db.Kinds
 import com.astraplay.tv.data.db.MediaEntry
@@ -73,6 +74,13 @@ class UserDataActivity : AppCompatActivity() {
         load()
     }
 
+    override fun onResume() {
+        super.onResume()
+        // процесс могли убить в фоне — запоминаем вкладку для восстановления ([[LastScreen]])
+        LastScreen.save(this, UserDataActivity::class.java,
+            org.json.JSONObject().put("history", showHistory))
+    }
+
     private fun refreshTabs() {
         val accent = ThemeManager.accentColor(this)
         favTab.setTextColor(if (showHistory) ThemeManager.colorOf(this, android.R.attr.textColorPrimary) else accent)
@@ -89,7 +97,8 @@ class UserDataActivity : AppCompatActivity() {
                 }
             }
         } else {
-            status.text = ""
+            // удаление неочевидно с пульта — подсказываем прямо на экране
+            status.text = "ОК — открыть • удержание ОК — меню удаления"
             status.isClickable = false
         }
     }
@@ -116,7 +125,10 @@ class UserDataActivity : AppCompatActivity() {
             val items = withContext(Dispatchers.IO) {
                 if (showHistory) store.history() else store.favorites()
             }
-            status.text = if (!showHistory) "" else if (items.isEmpty()) getString(R.string.empty) else ""
+            // подсказку про удаление в «Избранном» не затираем — refreshTabs() задаёт её
+            status.text = if (!showHistory) {
+                if (items.isEmpty()) getString(R.string.empty) else status.text
+            } else if (items.isEmpty()) getString(R.string.empty) else ""
             grid.adapter = EntriesAdapter(items)
         }
     }
@@ -178,16 +190,25 @@ class UserDataActivity : AppCompatActivity() {
             )
             holder.card.setOnClickListener { open(e) }
             holder.card.setOnLongClickListener {
-                Dialogs.confirm(this@UserDataActivity, getString(R.string.delete), e.title) {
-                    lifecycleScope.launch(Dispatchers.IO) {
-                        if (showHistory) {
-                            // из истории удаляем по ключу kind+itemId через повторную вставку невозможна — прямое удаление
-                            ServiceLocator.store.removeHistory(e.kind, e.itemId)
-                        } else {
-                            store.removeFavorite(e.kind, e.itemId)
+                // меню вместо мгновенного подтверждения: видно, что можно и открыть, и удалить
+                val options = listOf(
+                    "Открыть",
+                    if (showHistory) "Удалить из истории" else "Удалить из избранного",
+                    "Отмена")
+                Dialogs.choice(this@UserDataActivity, e.title, options, 0) { idx ->
+                    when (idx) {
+                        0 -> open(e)
+                        1 -> {
+                            lifecycleScope.launch(Dispatchers.IO) {
+                                if (showHistory) {
+                                    ServiceLocator.store.removeHistory(e.kind, e.itemId)
+                                } else {
+                                    store.removeFavorite(e.kind, e.itemId)
+                                }
+                            }
+                            load()
                         }
                     }
-                    load()
                 }
                 true
             }

@@ -54,6 +54,8 @@ enum class CatalogSection(val path: String, val titleRes: Int) {
     NOW_PLAYING("/movie/now_playing", R.string.section_now_playing),
     POPULAR_TV("/tv/popular", R.string.section_popular_tv),
     TOP_TV("/tv/top_rated", R.string.section_top_tv),
+    UPCOMING_MOVIES("/movie/upcoming", R.string.section_upcoming),
+    ON_THE_AIR("/tv/on_the_air", R.string.section_onair),
 }
 
 /** Клиент TMDB (бесплатный API). Ключ задаётся в настройках или gradle.properties. */
@@ -76,9 +78,18 @@ class TmdbClient(private val http: Http, private val prefs: Prefs) {
         withContext(Dispatchers.IO) {
             runCatching {
                 val json = call(section.path, "page=$page")
-                parseItems(json.optJSONArray("results") ?: JSONArray())
+                // Тип раздела известен из пути (/tv/…): отдельные ответы без media_type
+                // больше не превращаются в фильмы.
+                parseItems(json.optJSONArray("results") ?: JSONArray(), forcedType(section.path))
             }
         }
+
+    /** Тип записей по пути раздела; mixed-выдачи (trending, multi) — null. */
+    private fun forcedType(path: String): String? = when {
+        path.startsWith("/tv/") -> "tv"
+        path.startsWith("/movie/") -> "movie"
+        else -> null
+    }
 
     suspend fun search(query: String, page: Int = 1): Result<List<TmdbItem>> =
         withContext(Dispatchers.IO) {
@@ -94,7 +105,7 @@ class TmdbClient(private val http: Http, private val prefs: Prefs) {
         withContext(Dispatchers.IO) {
             runCatching {
                 val json = call("/$mediaType/$id", "append_to_response=videos")
-                val item = parseItem(json, mediaType)
+                val item = TmdbJson.parseItem(json, mediaType)
                 val genres = json.optJSONArray("genres")?.let { arr ->
                     (0 until arr.length()).map { arr.getJSONObject(it).optString("name") }
                 } ?: emptyList()
@@ -107,25 +118,16 @@ class TmdbClient(private val http: Http, private val prefs: Prefs) {
                             .sortedByDescending { it.optString("official").toBoolean() }
                             .firstOrNull()?.optString("key")
                     }
+                // В ответе /tv/{id} у сезонов нет массива episodes — только метаданные.
+                // Список серий грузим лениво отдельным запросом season().
                 val seasons = if (mediaType == "tv") {
                     json.optJSONArray("seasons")?.let { arr ->
                         (0 until arr.length()).mapNotNull { s ->
                             val so = arr.getJSONObject(s)
-                            val epsJson = so.optJSONArray("episodes")
-                            if (epsJson == null) null
-                            else Season(
-                                number = so.optInt("season_number"),
-                                name = so.optString("name"),
-                                episodes = (0 until epsJson.length()).map { e ->
-                                    val eo = epsJson.getJSONObject(e)
-                                    Episode(
-                                        number = eo.optInt("episode_number"),
-                                        name = eo.optString("name"),
-                                        airDate = eo.optString("air_date"),
-                                        still = eo.optString("still_path").ifEmpty { null },
-                                    )
-                                }
-                            )
+                            val number = so.optInt("season_number")
+                            // сезон 0 — «Спецматериалы», в списке не показываем
+                            if (number < 1) null
+                            else Season(number = number, name = so.optString("name"), episodes = emptyList())
                         }
                     } ?: emptyList()
                 } else emptyList()
@@ -140,15 +142,65 @@ class TmdbClient(private val http: Http, private val prefs: Prefs) {
             }
         }
 
-    // ---------- парсинг ----------
-
-    private fun parseItems(arr: JSONArray): List<TmdbItem> =
-        (0 until arr.length()).mapNotNull { i ->
-            runCatching { parseItem(arr.getJSONObject(i), null) }.getOrNull()
+    /** Похожее (официальные рекомендации TMDB): GET /{type}/{id}/recommendations. */
+    suspend fun recommendations(id: Int, mediaType: String, page: Int = 1): Result<List<TmdbItem>> =
+        withContext(Dispatchers.IO) {
+            runCatching {
+                val json = call("/$mediaType/$id/recommendations", "page=$page")
+                parseItems(json.optJSONArray("results") ?: JSONArray(), mediaType)
+                    .filter { it.mediaType == "movie" || it.mediaType == "tv" }
+            }
         }
 
-    private fun parseItem(o: JSONObject, forcedType: String?): TmdbItem {
-        val type = forcedType ?: o.optString("media_type", "movie")
+    /** Серии конкретного сезона: GET /tv/{id}/season/{n}. */
+    suspend fun season(id: Int, seasonNumber: Int): Result<Season> =
+        withContext(Dispatchers.IO) {
+            runCatching {
+                val json = call("/tv/$id/season/$seasonNumber")
+                val eps = json.optJSONArray("episodes") ?: JSONArray()
+                Season(
+                    number = seasonNumber,
+                    name = json.optString("name"),
+                    episodes = (0 until eps.length()).map { e ->
+                        val eo = eps.getJSONObject(e)
+                        Episode(
+                            number = eo.optInt("episode_number"),
+                            name = eo.optString("name"),
+                            airDate = eo.optString("air_date"),
+                            still = eo.optString("still_path").ifEmpty { null },
+                        )
+                    }
+                )
+            }
+        }
+
+    // ---------- парсинг ----------
+
+    private fun parseItems(arr: JSONArray, forcedType: String? = null): List<TmdbItem> =
+        TmdbJson.parseItems(arr, forcedType)
+
+
+    // ---------- картинки ----------
+
+    fun posterUrl(path: String?, width: Int = 342): String? =
+        path?.let { "https://image.tmdb.org/t/p/w$width$it" }
+
+    fun backdropUrl(path: String?): String? =
+        path?.let { "https://image.tmdb.org/t/p/w780$it" }
+}
+
+/** Разбор ответов TMDB. Отдельный объект — покрывается юнит-тестами без Android. */
+internal object TmdbJson {
+
+    fun parseItems(arr: JSONArray, forcedType: String? = null): List<TmdbItem> =
+        (0 until arr.length()).mapNotNull { i ->
+            runCatching { parseItem(arr.getJSONObject(i), forcedType) }.getOrNull()
+        }
+
+    fun parseItem(o: JSONObject, forcedType: String?): TmdbItem {
+        // media_type записи приоритетнее типа раздела: смешанные выдачи
+        // (trending, multi-search) разбираются по каждой записи отдельно.
+        val type = forcedType ?: o.optString("media_type").ifEmpty { null } ?: "movie"
         val title = when (type) {
             "tv" -> o.optString("name")
             else -> o.optString("title")
@@ -171,12 +223,4 @@ class TmdbClient(private val http: Http, private val prefs: Prefs) {
             } ?: emptyList(),
         )
     }
-
-    // ---------- картинки ----------
-
-    fun posterUrl(path: String?, width: Int = 342): String? =
-        path?.let { "https://image.tmdb.org/t/p/w$width$it" }
-
-    fun backdropUrl(path: String?): String? =
-        path?.let { "https://image.tmdb.org/t/p/w780$it" }
 }

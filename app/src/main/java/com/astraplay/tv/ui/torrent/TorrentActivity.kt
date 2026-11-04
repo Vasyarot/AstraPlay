@@ -12,6 +12,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.astraplay.tv.R
+import com.astraplay.tv.core.LastScreen
 import com.astraplay.tv.core.ServiceLocator
 import com.astraplay.tv.data.db.Kinds
 import com.astraplay.tv.data.db.MediaEntry
@@ -93,6 +94,13 @@ class TorrentActivity : AppCompatActivity() {
             searchBtn.text = preset
             doSearch()
         }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // процесс могли убить в фоне — запоминаем поиск для восстановления ([[LastScreen]])
+        LastScreen.save(this, TorrentActivity::class.java,
+            org.json.JSONObject().put("query", query))
     }
 
     private fun askQuery() {

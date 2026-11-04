@@ -22,6 +22,9 @@
     <string name="section_now_playing">Сейчас в кино</string>
     <string name="section_popular_tv">Популярные сериалы</string>
     <string name="section_top_tv">Лучшие сериалы</string>
+    <string name="section_upcoming">Новинки (фильмы)</string>
+    <string name="section_onair">Новинки (сериалы)</string>
+    <string name="similar">Похожее</string>
 
     <!-- Общие -->
     <string name="add">Добавить</string>
@@ -87,6 +90,7 @@
 
     <!-- Локальные медиа -->
     <string name="local_media">Локальные медиа</string>
+    <string name="local_files">Мои файлы</string>
     <string name="no_permission">Нужно разрешение на хранилище для показа видео</string>
     <string name="grant">Разрешить</string>
 
@@ -175,4 +179,30 @@
     <string name="all_free_note">Все функции бесплатны. Без рекламы и подписок.</string>
     <string name="select_theme">Выбор темы</string>
     <string name="enter_value">Введите значение</string>
+    <!-- Нативная карточка источника -->
+    <string name="source_details_unsupported">Этот адрес пока открывается во встроенном браузере</string>
+    <string name="source_details_network_error">Не удалось загрузить карточку. Проверьте сеть и повторите.</string>
+    <string name="source_details_no_native_play">Воспроизведение этой серии — на странице источника</string>
+    <string name="open_source_page">Открыть страницу источника</string>
+    <string name="retry">Повторить</string>
+    <string name="webdav_https_required">Пароль нельзя передавать по HTTP. Используйте HTTPS или включите разрешение HTTP в настройках.</string>
+    <string name="webdav_allow_http">Разрешить WebDAV без шифрования (HTTP)</string>
+    <string name="original_title">Оригинальное название</string>
+    <string name="director">Режиссёр</string>
+    <string name="cast">В ролях</string>
+
+    <!-- Восстановление экрана, таймеры сна/включения -->
+    <string name="restore_last_screen">Возвращаемся к последнему экрану…</string>
+    <string name="sleep_sync">Как в системе • %1$d мин бездействия</string>
+    <string name="sleep_sync_set">Пауза через %1$d мин бездействия — синхронно с таймером Android</string>
+    <string name="wake_group">Таймер включения (бета)</string>
+    <string name="wake_timer">Включение по таймеру</string>
+    <string name="wake_off">Выкл</string>
+    <string name="wake_daily">Каждый день</string>
+    <string name="wake_once">Одноразово через N минут</string>
+    <string name="wake_time_hint">ЧЧ:ММ, например 07:00</string>
+    <string name="wake_minutes_hint">Минут (1–1440), например 30</string>
+    <string name="wake_bad_time">Не похоже на время. Пример: 07:30</string>
+    <string name="wake_bad_minutes">Нужно число минут от 1 до 1440</string>
+    <string name="wake_note">Включит канал и зажжёт экран, если приставка не спит или разбудится сама. Из полного выключения приложение включить не может — это прошивка. Решение: включите таймер питания самого телевизора (Настройки ТВ → Система → Питание) на пару минут раньше — он разбудит приставку, а таймер AstraPlay откроет канал.</string>
 </resources>

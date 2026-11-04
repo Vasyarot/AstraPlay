@@ -10,8 +10,17 @@ import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
+import androidx.recyclerview.widget.RecyclerView
 import coil.load
 import com.astraplay.tv.ui.theme.ThemeManager
+
+/**
+ * Единый ViewHolder для [PosterCard]. Все адаптеры, чьи ViewHolder попадают
+ * в общий пул [CardPools], обязаны использовать именно его: пул не различает
+ * классы ViewHolder с одинаковым viewType, и чужой класс привёл бы к крашу
+ * при приведении типов.
+ */
+open class CardVH(val card: PosterCard) : RecyclerView.ViewHolder(card)
 
 /**
  * Универсальная TV-карточка. Режимы:
@@ -130,10 +139,11 @@ class PosterCard @JvmOverloads constructor(
             image.setImageDrawable(placeHolder)
             return
         }
+        // без crossfade: глобальный лоадер настроен на мгновенный показ —
+        // анимации на слабых приставках дают рывки при прокрутке
         image.load(url) {
             placeholder(placeHolder)
             error(placeHolder)
-            crossfade(120)
             allowRgb565(true)
         }
     }
@@ -149,13 +159,18 @@ class PosterCard @JvmOverloads constructor(
         animate().cancel()
         scaleX = 1f
         scaleY = 1f
-        val stroke = if (focused) ThemeManager.strokeColor(context) else Color.TRANSPARENT
-        val fill = if (focused) withAlpha(ThemeManager.accentColor(context), 40) else Color.TRANSPARENT
-        artwork.background = roundedBg(context, if (focused) fill else ThemeManager.cardColor(context), 14f, stroke, 2f)
+        // Drawable фокуса создаётся один раз: новый GradientDrawable на каждое
+        // перемещение фокуса давало рывки при быстрой навигации по сетке
+        artwork.background = if (focused) cachedFocusedBg else cachedIdleBg
         label.setTypeface(null, if (focused) Typeface.BOLD else Typeface.NORMAL)
         label.setTextColor(
             if (focused) ThemeManager.accentColor(context)
             else ThemeManager.colorOf(context, android.R.attr.textColorSecondary)
         )
+    }
+
+    private val cachedIdleBg by lazy { roundedBg(context, ThemeManager.cardColor(context), 14f) }
+    private val cachedFocusedBg by lazy {
+        roundedBg(context, withAlpha(ThemeManager.accentColor(context), 40), 14f, ThemeManager.strokeColor(context), 2f)
     }
 }

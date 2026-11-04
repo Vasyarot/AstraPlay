@@ -13,7 +13,7 @@ android {
         minSdk = 24          // Android 7.0 — поддержка TV-приставок 7/8/9+
         targetSdk = 34
         versionCode = 7
-        versionName = "1.5"
+        versionName = "0.03"   // пре-релиз; не повышать без запроса
         vectorDrawables.useSupportLibrary = true
         // Только нужные локали — меньше ресурсов в APK
         resourceConfigurations += listOf("ru", "en")
@@ -78,6 +78,8 @@ dependencies {
     androidTestImplementation("androidx.test:runner:1.6.2")
     implementation("org.jsoup:jsoup:1.17.2")
     testImplementation("junit:junit:4.13.2")
+    // org.json в юнит-тестах без Android-раннера «not mocked» — реальная реализация
+    testImplementation("org.json:json:20231013")
     // Базовые AndroidX — минимум для легкого APK на 1 ГБ RAM
     implementation("androidx.core:core-ktx:1.13.1")
     implementation("androidx.appcompat:appcompat:1.7.0")
@@ -91,6 +93,7 @@ dependencies {
     implementation("androidx.media3:media3-exoplayer-hls:1.4.1")
     implementation("androidx.media3:media3-exoplayer-dash:1.4.1")
     implementation("androidx.media3:media3-ui:1.4.1")
+    implementation("androidx.media3:media3-datasource-okhttp:1.4.1")
 
     // Сеть и картинки
     implementation("com.squareup.okhttp3:okhttp:4.12.0")

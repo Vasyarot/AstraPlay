@@ -11,7 +11,9 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import coil.load
 import com.astraplay.tv.R
+import com.astraplay.tv.core.LastScreen
 import com.astraplay.tv.core.ServiceLocator
 import com.astraplay.tv.data.db.*
 import com.astraplay.tv.data.iptv.*
@@ -24,9 +26,10 @@ import kotlinx.coroutines.*
 class LivePlayerActivity : AppCompatActivity() {
     private var player: ExoPlayer? = null
     private val httpFactory = androidx.media3.datasource.DefaultHttpDataSource.Factory()
-        .setAllowCrossProtocolRedirects(true).setUserAgent("AstraPlay/1.4")
+        .setAllowCrossProtocolRedirects(true)
+        .setUserAgent(com.astraplay.tv.data.net.Http.USER_AGENT)
     private fun applyHeaders(channel: Channel?) {
-        httpFactory.setUserAgent(channel?.userAgent ?: "AstraPlay/1.4")
+        httpFactory.setUserAgent(channel?.userAgent ?: com.astraplay.tv.data.net.Http.USER_AGENT)
         httpFactory.setDefaultRequestProperties(channel?.referrer?.let { mapOf("Referer" to it) } ?: emptyMap())
     }
     private lateinit var video: PlayerView
@@ -34,12 +37,15 @@ class LivePlayerActivity : AppCompatActivity() {
     private lateinit var chrome: LinearLayout
     private lateinit var headline: TextView
     private lateinit var description: TextView
+    private lateinit var channelLogo: ImageView
     private lateinit var drawer: LinearLayout
     private lateinit var channelList: RecyclerView
     private var channels: List<Channel> = emptyList()
     private var channelIndex = 0
     private var drawerPosition = 0
     private lateinit var channelButton: TextView
+    private lateinit var favButton: TextView
+    private var favSet: Set<String> = emptySet()
     private var currentUrl = ""
     private var currentTitle = ""
     private var playing = true
@@ -57,24 +63,62 @@ class LivePlayerActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         ThemeManager.apply(this)
         super.onCreate(savedInstanceState)
+        // таймер включения стартует канал при погашенном экране: включаем экран
+        if (android.os.Build.VERSION.SDK_INT >= 27) {
+            setShowWhenLocked(true)
+            setTurnScreenOn(true)
+        }
         currentUrl = savedInstanceState?.getString("url") ?: intent.getStringExtra("url") ?: ""
         currentTitle = savedInstanceState?.getString("title") ?: intent.getStringExtra("title") ?: "IPTV"
         if (currentUrl.isBlank()) { finish(); return }
+        // канал восстанавливается при возврате в приложение ([[LastScreen]])
+        LastScreen.save(this, LivePlayerActivity::class.java, org.json.JSONObject()
+            .put("url", currentUrl)
+            .put("title", currentTitle))
         root = FrameLayout(this)
         video = PlayerView(this).apply { useController = false; keepScreenOn = true; isFocusable = true; isFocusableInTouchMode = true }
         root.addView(video, FrameLayout.LayoutParams(-1, -1))
         chrome = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(24.dp(this@LivePlayerActivity), 16.dp(this@LivePlayerActivity), 24.dp(this@LivePlayerActivity), 16.dp(this@LivePlayerActivity))
-            setBackgroundColor(0xE6101422.toInt())
+            setPadding(28.dp(this@LivePlayerActivity), 22.dp(this@LivePlayerActivity), 28.dp(this@LivePlayerActivity), 18.dp(this@LivePlayerActivity))
+            // мягкая шторка: у видео прозрачная, к низу — плотная тёмная
+            background = android.graphics.drawable.GradientDrawable(
+                android.graphics.drawable.GradientDrawable.Orientation.TOP_BOTTOM,
+                intArrayOf(0x00131A2E, 0xB6131A2E.toInt(), 0xF5101422.toInt()))
         }
-        headline = TextView(this).apply { textSize = 23f; setTextColor(-1); text = currentTitle }
-        description = TextView(this).apply { textSize = 13f; setTextColor(0xFFD0D7E8.toInt()) }
-        chrome.addView(headline)
+        val headRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = android.view.Gravity.CENTER_VERTICAL
+        }
+        headline = TextView(this).apply {
+            textSize = 24f
+            setTextColor(-1)
+            setTypeface(typeface, android.graphics.Typeface.BOLD)
+            text = currentTitle
+            layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+        }
+        channelLogo = ImageView(this).apply {
+            layoutParams = LinearLayout.LayoutParams(52.dp(this@LivePlayerActivity), 52.dp(this@LivePlayerActivity)).apply {
+                leftMargin = 12.dp(this@LivePlayerActivity)
+            }
+            visibility = View.GONE
+            clipToOutline = true
+            background = roundedBg(this@LivePlayerActivity, 0x22FFFFFF, 10f)
+        }
+        headRow.addView(headline)
+        headRow.addView(channelLogo)
+        description = TextView(this).apply {
+            textSize = 13f
+            setTextColor(0xFFC9D2E6.toInt())
+            setPadding(0, 6.dp(this@LivePlayerActivity), 0, 10.dp(this@LivePlayerActivity))
+        }
+        chrome.addView(headRow)
         chrome.addView(description)
         val actions = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
         channelButton = tvButton(this, "Каналы", R.drawable.ic_tv) { showChannels() }
         actions.addView(channelButton)
+        favButton = tvButton(this, getString(R.string.add_to_fav), R.drawable.ic_star) { toggleChannelFav() }
+        actions.addView(favButton)
         actions.addView(tvButton(this, "Предыдущий") { switchChannel(-1) })
         actions.addView(tvButton(this, "Следующий") { switchChannel(1) })
         actions.addView(tvButton(this, "Пауза / эфир") { togglePause() })
@@ -125,6 +169,7 @@ class LivePlayerActivity : AppCompatActivity() {
             channels = result.ifEmpty { listOf(Channel(name = currentTitle, url = currentUrl)) }
             channelIndex = channels.indexOfFirst { it.url == currentUrl }.coerceAtLeast(0)
             channelList.adapter = ChannelAdapter()
+            refreshFavSet()
             applyHeaders(channels.getOrNull(channelIndex))
             if (channels.getOrNull(channelIndex)?.let { it.userAgent != null || it.referrer != null } == true) {
                 player?.apply { setMediaItem(MediaItem.fromUri(currentUrl)); prepare(); playWhenReady = playing }
@@ -186,12 +231,42 @@ class LivePlayerActivity : AppCompatActivity() {
         }
         root.post(refreshInfo)
         focusControls()
+        // синхронный таймер сна: пауза после таймаута экрана Android ([[Prefs.sleepSyncSystem]])
+        if (ServiceLocator.prefs.sleepSyncSystem) startSystemSleepSync()
+    }
+
+    private var idleRunnable: Runnable? = null
+    private var lastInteractionAt = 0L
+
+    private fun startSystemSleepSync() {
+        idleRunnable?.let { root.removeCallbacks(it) }
+        val timeoutMs = runCatching {
+            android.provider.Settings.System.getInt(
+                contentResolver, android.provider.Settings.System.SCREEN_OFF_TIMEOUT, 0).toLong()
+        }.getOrDefault(0L).coerceAtLeast(60_000L)
+        if (timeoutMs <= 0) return
+        lastInteractionAt = android.os.SystemClock.elapsedRealtime()
+        val r = object : Runnable {
+            override fun run() {
+                if (android.os.SystemClock.elapsedRealtime() - lastInteractionAt >= timeoutMs) {
+                    player?.pause()
+                    Toast.makeText(this@LivePlayerActivity,
+                        getString(R.string.sleep_done), Toast.LENGTH_LONG).show()
+                } else {
+                    root.postDelayed(this, 10_000L)
+                }
+            }
+        }
+        idleRunnable = r
+        root.postDelayed(r, 10_000L)
     }
 
     override fun onStop() {
         playing = player?.playWhenReady ?: playing
         root.removeCallbacks(hideChrome)
         root.removeCallbacks(refreshInfo)
+        idleRunnable?.let { root.removeCallbacks(it) }
+        idleRunnable = null
         video.player = null
         player?.release()
         player = null
@@ -200,6 +275,55 @@ class LivePlayerActivity : AppCompatActivity() {
 
     private fun displayName(ch: Channel): String = getSharedPreferences("iptv_display", MODE_PRIVATE)
         .getString("name_${ch.url}", null) ?: ch.displayName
+
+    // ---------- избранное каналов ----------
+
+    private fun refreshFavSet() {
+        lifecycleScope.launch {
+            favSet = withContext(Dispatchers.IO) {
+                ServiceLocator.store.favorites(Kinds.CHANNEL).map { it.itemId }.toSet()
+            }
+            updateFavButton()
+            updateChannelLogo()
+            if (drawer.visibility == View.VISIBLE) channelList.adapter?.notifyDataSetChanged()
+        }
+    }
+
+    private fun updateFavButton() {
+        val ch = channels.getOrNull(channelIndex) ?: return
+        val fav = favSet.contains(ch.key)
+        favButton.text = if (fav) getString(R.string.remove_from_fav) else getString(R.string.add_to_fav)
+    }
+
+    /** Логотип канала в шапке: скрыт, если у канала нет картинки. */
+    private fun updateChannelLogo() {
+        val logo = channels.getOrNull(channelIndex)?.logo
+        if (logo.isNullOrBlank()) {
+            channelLogo.visibility = View.GONE
+            return
+        }
+        channelLogo.visibility = View.VISIBLE
+        channelLogo.load(logo) { crossfade(false) }
+    }
+
+    private fun toggleChannelFav() {
+        val ch = channels.getOrNull(channelIndex) ?: return
+        lifecycleScope.launch {
+            val fav = withContext(Dispatchers.IO) { ServiceLocator.store.isFavorite(Kinds.CHANNEL, ch.key) }
+            if (fav) {
+                withContext(Dispatchers.IO) { ServiceLocator.store.removeFavorite(Kinds.CHANNEL, ch.key) }
+                Toast.makeText(this@LivePlayerActivity, getString(R.string.removed_from_fav), Toast.LENGTH_SHORT).show()
+            } else {
+                withContext(Dispatchers.IO) {
+                    ServiceLocator.store.addFavorite(MediaEntry(
+                        Kinds.CHANNEL, ch.key, currentTitle,
+                        subtitle = ch.displayGroup, poster = ch.logo, url = ch.url))
+                }
+                Toast.makeText(this@LivePlayerActivity, getString(R.string.added_to_fav), Toast.LENGTH_SHORT).show()
+            }
+            refreshFavSet()
+        }
+    }
 
     private fun updateStatus() {
         headline.text = if (channels.isEmpty()) currentTitle else "${channelIndex + 1} / ${channels.size}  •  $currentTitle"
@@ -266,6 +390,8 @@ class LivePlayerActivity : AppCompatActivity() {
         val entry = MediaEntry(Kinds.CHANNEL, channel.key, currentTitle, subtitle = channel.displayGroup, poster = channel.logo, url = channel.url)
         lifecycleScope.launch(Dispatchers.IO) { ServiceLocator.store.addHistory(entry) }
         closeChannels()
+        updateFavButton()
+        updateChannelLogo()
         updateStatus()
         showChrome()
     }
@@ -307,6 +433,8 @@ class LivePlayerActivity : AppCompatActivity() {
     }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        // любое нажатие на пульте сбрасывает синхронный таймер — как системный
+        lastInteractionAt = android.os.SystemClock.elapsedRealtime()
         if (drawer.visibility == View.VISIBLE && event.keyCode in setOf(
                 KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_DPAD_DOWN, KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER)) {
             if (event.action == KeyEvent.ACTION_DOWN) when (event.keyCode) {
@@ -387,7 +515,8 @@ class LivePlayerActivity : AppCompatActivity() {
         })
         override fun onBindViewHolder(holder: Holder, position: Int) {
             val channel = channels[position]
-            holder.text.text = "${position + 1}. ${displayName(channel)}" + if (position == channelIndex) "  ●" else ""
+            val star = if (favSet.contains(channel.key)) "★ " else ""
+            holder.text.text = "${position + 1}. $star${displayName(channel)}" + if (position == channelIndex) "  ●" else ""
             holder.text.isFocusable = false
             holder.text.background = roundedBg(this@LivePlayerActivity,
                 if (position == drawerPosition) withAlpha(ThemeManager.accentColor(this@LivePlayerActivity), 75) else ThemeManager.cardColor(this@LivePlayerActivity),

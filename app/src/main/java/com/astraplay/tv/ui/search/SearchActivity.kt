@@ -11,6 +11,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.astraplay.tv.R
+import com.astraplay.tv.core.LastScreen
 import com.astraplay.tv.core.ServiceLocator
 import com.astraplay.tv.data.db.Kinds
 import com.astraplay.tv.data.db.MediaEntry
@@ -84,6 +85,13 @@ class SearchActivity : AppCompatActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         handleIntent(intent)
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // процесс могли убить в фоне — запоминаем запрос для восстановления ([[LastScreen]])
+        LastScreen.save(this, SearchActivity::class.java,
+            org.json.JSONObject().put("query", query))
     }
 
     private fun handleIntent(intent: Intent?) {

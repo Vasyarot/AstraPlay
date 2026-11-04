@@ -11,7 +11,7 @@ class ChannelProbe(client: OkHttpClient) {
 
     fun responds(url: String, userAgent: String? = null, referrer: String? = null): Boolean = runCatching {
         val request = Request.Builder().url(url).header("Range", "bytes=0-2047")
-            .header("User-Agent", userAgent ?: "AstraPlay/1.4")
+            .header("User-Agent", userAgent ?: com.astraplay.tv.data.net.Http.USER_AGENT)
         referrer?.let { request.header("Referer", it) }
         http.newCall(request.build()).execute().use { response ->
             if (!response.isSuccessful) return false

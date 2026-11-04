@@ -34,7 +34,9 @@
 
         <activity
             android:name=".ui.home.HomeActivity"
-            android:exported="true">
+            android:exported="true"
+            android:alwaysRetainTaskState="true"
+            android:launchMode="singleTask">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
@@ -43,9 +45,11 @@
         </activity>
 
         <activity android:name=".player.LivePlayerActivity" android:exported="false"
+            android:showWhenLocked="true" android:turnScreenOn="true"
             android:screenOrientation="landscape" android:theme="@style/Theme.AstraPlay.Player" />
-        <activity
-            android:name=".player.PlayerActivity"
+        <activity android:name=".player.EmbedPlayerActivity" android:exported="false"
+            android:screenOrientation="landscape" android:theme="@style/Theme.AstraPlay.Player" />
+        <activity android:name=".player.PlayerActivity"
             android:exported="false"
             android:launchMode="singleTask"
             android:screenOrientation="landscape"
@@ -62,8 +66,14 @@
             android:name=".ui.smb.SmbBrowserActivity"
             android:exported="false" />
         <activity android:name=".ui.torrent.TorrentPlayerActivity" android:exported="false" />
+        <activity
+            android:name=".player.YouTubeActivity"
+            android:exported="false"
+            android:screenOrientation="landscape"
+            android:theme="@style/Theme.AstraPlay.Player" />
         <activity android:name=".ui.movies.SourcesActivity" android:exported="false" />
         <activity android:name=".ui.movies.SourceWebActivity" android:exported="false" />
+        <activity android:name=".ui.movies.SourceDetailsActivity" android:exported="false" />
         <activity
             android:name=".ui.movies.CatalogActivity"
             android:exported="false" />
@@ -110,5 +120,11 @@
                 <action android:name="android.intent.action.QUICKBOOT_POWERON" />
             </intent-filter>
         </receiver>
+
+        <!-- Таймер включения: будильник AlarmManager запускает телеканал -->
+        <receiver
+            android:name=".tv.WakeReceiver"
+            android:enabled="true"
+            android:exported="false" />
     </application>
 </manifest>

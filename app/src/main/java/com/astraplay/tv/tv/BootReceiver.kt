@@ -13,6 +13,8 @@ class BootReceiver : BroadcastReceiver() {
         if (action != Intent.ACTION_BOOT_COMPLETED &&
             action != "android.intent.action.QUICKBOOT_POWERON") return
         ServiceLocator.init(context)
+        // будильники не переживают перезагрузку — таймер включения перезапланируем
+        com.astraplay.tv.core.WakeTimer.schedule(context)
         if (!ServiceLocator.prefs.autostart) return
         context.startActivity(Intent(context, HomeActivity::class.java).apply {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)

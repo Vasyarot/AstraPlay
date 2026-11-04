@@ -22,6 +22,8 @@ class SourceWebActivity : AppCompatActivity() {
     private lateinit var status: TextView
     private var fullscreen: View? = null
     private var fullscreenCallback: WebChromeClient.CustomViewCallback? = null
+    private var autoRetries = 0
+    private var loadingView: TextView? = null
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -29,12 +31,15 @@ class SourceWebActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         val url = intent.getStringExtra("url") ?: ""
         if (!OnlineSources.validWebUrl(url)) { finish(); return }
-        root = FrameLayout(this)
+        root = FrameLayout(this).apply {
+            // тёмный фон темы вместо белой вспышки до отрисовки страницы
+            setBackgroundColor(ThemeManager.colorOf(this@SourceWebActivity, android.R.attr.colorBackground))
+        }
         val column = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         val toolbar = HorizontalScrollView(this).apply { isHorizontalScrollBarEnabled = false }
         val actions = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
         actions.addView(tvButton(this, "Назад", R.drawable.ic_arrow_back) { onBackPressed() })
-        actions.addView(tvButton(this, "Обновить", R.drawable.ic_refresh) { if (::web.isInitialized) web.reload() })
+        actions.addView(tvButton(this, "Обновить", R.drawable.ic_refresh) { if (::web.isInitialized) { autoRetries = 0; web.reload() } })
         actions.addView(tvButton(this, "Адрес", R.drawable.ic_search) {
             Dialogs.input(this, "Открыть страницу", "https://…", if (::web.isInitialized) web.url ?: url else url) { value ->
                 if (OnlineSources.validWebUrl(value) && ::web.isInitialized) web.loadUrl(value)
@@ -44,7 +49,7 @@ class SourceWebActivity : AppCompatActivity() {
         actions.addView(tvButton(this, "Войти") {
             if (::web.isInitialized) {
                 val current = Uri.parse(web.url ?: url)
-                val login = if (current.host.orEmpty().endsWith("lostfilm.tv")) current.buildUpon().path("/login").clearQuery().fragment(null).build().toString()
+                val login = if (current.host.orEmpty().let { it.endsWith("lostfilm.tv") || it.endsWith("lostfilm.download") }) current.buildUpon().path("/login").clearQuery().fragment(null).build().toString()
                     else current.buildUpon().path("/").clearQuery().fragment(null).build().toString()
                 web.loadUrl(login)
             }
@@ -107,10 +112,24 @@ class SourceWebActivity : AppCompatActivity() {
             override fun onPageFinished(view: WebView, url: String) {
                 CookieManager.getInstance().flush()
                 status.text = "${Uri.parse(url).host} • ОК — выбрать • Назад — предыдущая страница"
+                loadingView?.let { (it.parent as? ViewGroup)?.removeView(it); loadingView = null }
             }
 
             override fun onReceivedError(view: WebView, request: WebResourceRequest, error: WebResourceError) {
-                if (request.isForMainFrame) status.text = "Сайт недоступен: ${error.description}. Можно изменить адрес источника."
+                if (!request.isForMainFrame) return
+                val desc = error.description?.toString() ?: ""
+                // Сервер иногда сбрасывает соединение с первой попытки — браузеры
+                // переживают это автоповтором; повторяем до 2 раз для «мимолётных» сбоев.
+                val transient = listOf(
+                    "ERR_HTTP2_PROTOCOL_ERROR", "ERR_CONNECTION_RESET",
+                    "ERR_CONNECTION_CLOSED", "ERR_EMPTY_RESPONSE").any { desc.contains(it) }
+                if (transient && autoRetries < 2) {
+                    autoRetries++
+                    status.text = "Соединение сброшено • повторяем ($autoRetries/2)…"
+                    view.postDelayed({ if (::web.isInitialized) web.reload() }, 1500)
+                } else {
+                    status.text = "Сайт недоступен: $desc. Можно изменить адрес источника."
+                }
             }
         }
         web.webChromeClient = object : WebChromeClient() {
@@ -131,6 +150,18 @@ class SourceWebActivity : AppCompatActivity() {
         column.addView(web, LinearLayout.LayoutParams(-1, 0, 1f))
         root.addView(column)
         setContentView(root)
+        // заставка в стиле приложения, пока сайт не отрисуется
+        val title = intent.getStringExtra("title") ?: ""
+        val loading = TextView(this).apply {
+            text = if (title.isEmpty()) "Загружаем страницу…" else "Открываем «$title»…"
+            textSize = 16f
+            gravity = android.view.Gravity.CENTER
+            setTextColor(ThemeManager.colorOf(this@SourceWebActivity, android.R.attr.textColorSecondary))
+        }
+        root.addView(loading, FrameLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT,
+            android.view.Gravity.CENTER))
+        loadingView = loading
         if (savedInstanceState == null) web.loadUrl(url) else web.restoreState(savedInstanceState)
     }
 

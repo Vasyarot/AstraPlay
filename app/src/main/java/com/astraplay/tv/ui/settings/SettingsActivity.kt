@@ -103,6 +103,10 @@ class SettingsActivity : AppCompatActivity() {
         group("Телепрограмма")
         toggleRow("Загружать автоматически", prefs.autoEpg) { prefs.autoEpg = it }
 
+        group(getString(R.string.wake_group))
+        row(getString(R.string.wake_timer), com.astraplay.tv.core.WakeTimer.describe(prefs)) { showWakeTimerMenu() }
+        note(getString(R.string.wake_note))
+
         group(getString(R.string.data_group))
         row(getString(R.string.backup), "") { createBackup.launch("astraplay-backup.json") }
         row(getString(R.string.restore), "") {
@@ -114,7 +118,13 @@ class SettingsActivity : AppCompatActivity() {
         row(getString(R.string.webdav_url), webdavShort(prefs.webdavUrl)) {
             com.astraplay.tv.ui.common.Dialogs.input(this, getString(R.string.webdav_url),
                 "https://webdav.server.ru/path/", prefs.webdavUrl) { v ->
-                prefs.webdavUrl = v; recreate()
+                val clean = v.trim()
+                if (clean.startsWith("http://") && prefs.webdavUser.isNotBlank() && !prefs.webdavAllowHttp) {
+                    // пароль по HTTP не передаём; исключение — осознанная настройка ниже
+                    Toast.makeText(this, getString(R.string.webdav_https_required), Toast.LENGTH_LONG).show()
+                    return@input
+                }
+                prefs.webdavUrl = clean; recreate()
             }
         }
         row(getString(R.string.webdav_user), if (prefs.webdavUser.isBlank()) "—" else prefs.webdavUser) {
@@ -124,6 +134,10 @@ class SettingsActivity : AppCompatActivity() {
         row(getString(R.string.webdav_password), if (prefs.webdavPass.isBlank()) "—" else "••••") {
             com.astraplay.tv.ui.common.Dialogs.input(this, getString(R.string.webdav_password),
                 "", "", allowEmpty = true, password = true) { v -> prefs.webdavPass = v; recreate() }
+        }
+        // осознанное разрешение на соединение без шифрования (пароль по HTTP)
+        toggleRow(getString(R.string.webdav_allow_http), prefs.webdavAllowHttp) {
+            prefs.webdavAllowHttp = it
         }
         row(getString(R.string.sync_now), "") { runWebDavSync() }
 
@@ -141,6 +155,51 @@ class SettingsActivity : AppCompatActivity() {
 
     private fun selIdx(value: Int, options: List<Int>): Int = options.indexOf(value).coerceAtLeast(0)
 
+    // ---------- таймер включения ----------
+
+    private fun showWakeTimerMenu() {
+        com.astraplay.tv.ui.common.Dialogs.choice(this, getString(R.string.wake_timer),
+            listOf(getString(R.string.wake_off), getString(R.string.wake_daily), getString(R.string.wake_once)),
+            if (prefs.wakeMode == 1) 1 else if (prefs.wakeMode == 2) 2 else 0) { idx ->
+            when (idx) {
+                0 -> {
+                    prefs.wakeMode = 0
+                    com.astraplay.tv.core.WakeTimer.cancel(this)
+                    recreate()
+                }
+                1 -> com.astraplay.tv.ui.common.Dialogs.input(this, getString(R.string.wake_daily),
+                    getString(R.string.wake_time_hint),
+                    "%02d:%02d".format(prefs.wakeHour, prefs.wakeMinute)) { v ->
+                    val m = Regex("(\\d{1,2}):(\\d{2})").find(v.trim())
+                    val h = m?.groupValues?.get(1)?.toIntOrNull() ?: -1
+                    val mm = m?.groupValues?.get(2)?.toIntOrNull() ?: -1
+                    if (h !in 0..23 || mm !in 0..59) {
+                        Toast.makeText(this, getString(R.string.wake_bad_time), Toast.LENGTH_LONG).show()
+                        return@input
+                    }
+                    prefs.wakeHour = h
+                    prefs.wakeMinute = mm
+                    prefs.wakeMode = 1
+                    com.astraplay.tv.core.WakeTimer.schedule(this)
+                    recreate()
+                }
+                2 -> com.astraplay.tv.ui.common.Dialogs.input(this, getString(R.string.wake_once),
+                    getString(R.string.wake_minutes_hint), "${prefs.wakeDelayMin}") { v ->
+                    val n = v.trim().toIntOrNull() ?: 0
+                    if (n !in 1..24 * 60) {
+                        Toast.makeText(this, getString(R.string.wake_bad_minutes), Toast.LENGTH_LONG).show()
+                        return@input
+                    }
+                    prefs.wakeDelayMin = n
+                    prefs.wakeOnceAt = System.currentTimeMillis() + n * 60_000L
+                    prefs.wakeMode = 2
+                    com.astraplay.tv.core.WakeTimer.schedule(this)
+                    recreate()
+                }
+            }
+        }
+    }
+
     private fun webdavShort(url: String): String =
         if (url.isBlank()) "—" else url.substringAfter("://").take(28)
 
@@ -153,7 +212,7 @@ class SettingsActivity : AppCompatActivity() {
         Toast.makeText(this, getString(R.string.loading), Toast.LENGTH_SHORT).show()
         lifecycleScope.launch(Dispatchers.IO) {
             val result = runCatching {
-                val dav = com.astraplay.tv.data.webdav.WebDav(ServiceLocator.http)
+                val dav = com.astraplay.tv.data.webdav.WebDav(ServiceLocator.http, prefs.webdavAllowHttp)
                 val remote = dav.fetch("$url/astraplay-backup.json",
                     prefs.webdavUser.ifBlank { null }, prefs.webdavPass.ifBlank { null })
                 if (!remote.isNullOrBlank()) store.importJson(remote)  // объединение
